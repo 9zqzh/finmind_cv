@@ -1,0 +1,82 @@
+# 学院教学小助手 · Backend
+
+基于 **PydanticAI 2.x + FastAPI + DeepSeek（OpenAI 兼容）+ gdufjwxtapi** 的后端骨架，已可运行。
+
+## 目录结构
+
+```text
+backend/
+  app/
+    main.py                 # FastAPI 入口（健康检查、异常处理、CORS、路由挂载）
+    config.py               # 环境变量配置（pydantic-settings）
+    schemas/                # 统一响应结构、错误码、请求/响应模型
+    api/                    # HTTP 路由：auth / chat / jwxt / knowledge
+    services/
+      session.py            # 内存会话管理（token -> JwxtClient，TTL 过期）
+    adapters/
+      jwxt.py               # gdufjwxtapi 适配层（异常映射、async 包装）
+    agent/
+      model_client.py       # DeepSeek OpenAI 兼容模型客户端
+      prompts.py            # 系统提示词（含当前日期）
+      tools.py              # 7 个 Agent 工具 + AgentDeps 依赖注入
+      orchestrator.py       # Agent 构建与 run_chat 编排
+    knowledge/
+      service.py            # 文档加载/切片/关键词检索（后续可换向量检索）
+  data/
+    knowledge/              # 知识库资料（.md/.txt/.json，示例数据待替换）
+    information/            # 学院网站/竞赛资讯（示例数据待替换）
+  tests/                    # pytest 测试（16 个，覆盖检索/接口/Agent）
+```
+
+## 安装
+
+```powershell
+cd back_end\backend
+python -m venv .venv                       # 已创建可跳过
+.venv\Scripts\python -m pip install -e ".[test]"
+.venv\Scripts\python -m pip install -e ..\gdufjwxtapi   # 教务接口包
+```
+
+## 配置
+
+复制 `.env.example` 为 `.env` 并填写 `DEEPSEEK_API_KEY`。所有可调参数（模型名、教务地址、会话时长等）均可通过环境变量覆盖。
+
+## 运行
+
+```powershell
+# 启动后端（在 backend 目录下）
+.venv\Scripts\python -m uvicorn app.main:app --reload --port 8000
+```
+
+- 健康检查：`GET /`
+- 交互式接口文档：浏览器打开 `http://127.0.0.1:8000/docs`
+
+## 测试
+
+```powershell
+.venv\Scripts\python -m pytest
+```
+
+## 主要接口
+
+| 方法 | 路径 | 作用 |
+|---|---|---|
+| POST | `/api/auth/captcha` | 获取验证码（返回 session_token + base64 图片） |
+| POST | `/api/auth/login` | 学号/密码/验证码登录 |
+| POST | `/api/auth/logout` | 退出并销毁会话 |
+| GET | `/api/auth/status` | 查询登录状态 |
+| POST | `/api/chat` | Agent 对话（请求头带 `X-Session-Token` 可查个人数据） |
+| GET | `/api/schedule` | 个人课表 |
+| GET | `/api/classroom-schedule` | 教室课表 |
+| GET | `/api/grades` | 成绩列表与统计 |
+| GET | `/api/grades/{index}/detail` | 单科成绩明细 |
+| GET | `/api/training-plan` | 培养方案 |
+| GET | `/api/knowledge/search` | 知识库检索 |
+| GET | `/api/information/search` | 学院/竞赛资讯检索 |
+
+登录后除 `/api/chat` 外的接口需携带请求头 `X-Session-Token: <session_token>`。
+
+## 安全提醒
+
+- `.env` 已被 `.gitignore` 忽略，真实密钥严禁提交。
+- 曾出现在 `.env.example` 中的旧 DeepSeek Key 已清理，请到 DeepSeek 平台撤销该 Key 并重新生成。

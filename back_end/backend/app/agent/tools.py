@@ -1,0 +1,208 @@
+"""Agent 工具定义：把教务适配层与知识库检索注册为 PydanticAI 工具。
+
+约定：
+- 工具内部不抛业务异常给模型循环，而是返回 {"error": ...} 结构，
+  由模型组织可操作的错误提示（例如"请先登录"）。
+- 每次成功调用都会把 (result_type, data) 记录到 deps，供编排层输出结构化卡片。
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Annotated, Any
+
+from pydantic import Field
+from pydantic_ai import Agent, RunContext
+
+from app.adapters import jwxt as jwxt_adapter
+from app.knowledge import KnowledgeService
+from app.schemas.common import ApiError
+from app.services.session import JwxtSession
+
+# 工具名 -> 前端结果卡片类型
+RESULT_TYPES: dict[str, str] = {
+    "query_schedule": "schedule",
+    "query_classroom_schedule": "classroom_schedule",
+    "query_grades": "grades",
+    "query_grade_detail": "grade_detail",
+    "query_training_plan": "training_plan",
+    "search_knowledge": "knowledge",
+    "search_information": "information",
+}
+
+
+@dataclass
+class AgentDeps:
+    """Agent 运行时依赖：由编排层在每次对话时构造。"""
+
+    session: JwxtSession | None = None
+    knowledge: KnowledgeService | None = None
+    information: KnowledgeService | None = None
+    # 运行过程记录
+    tool_events: list[dict[str, Any]] = field(default_factory=list)
+    last_result_type: str = "text"
+    last_data: Any = None
+    sources: list[str] = field(default_factory=list)
+
+
+def _record_success(ctx: RunContext[AgentDeps], tool: str, data: Any) -> None:
+    result_type = RESULT_TYPES.get(tool, "text")
+    ctx.deps.tool_events.append({"tool": tool, "result_type": result_type, "ok": True})
+    ctx.deps.last_result_type = result_type
+    ctx.deps.last_data = data
+
+
+def _record_failure(ctx: RunContext[AgentDeps], tool: str, message: str) -> dict[str, Any]:
+    ctx.deps.tool_events.append(
+        {"tool": tool, "result_type": "text", "ok": False, "error": message}
+    )
+    return {"error": message}
+
+
+def register_tools(agent: Agent) -> None:
+    """把全部工具注册到 Agent 上。"""
+
+    @agent.tool
+    async def query_schedule(
+        ctx: RunContext[AgentDeps],
+        term: Annotated[
+            str, Field(description="学期，格式 YYYY-YYYY-1 或 YYYY-YYYY-2，如 2025-2026-1")
+        ],
+        week: int | None = Field(
+            default=None, description="教学周次（1-30），不传表示整学期课表"
+        ),
+    ) -> dict[str, Any]:
+        """查询当前登录学生本人的课表。返回课程名、上课时间、教室、教师、周次。"""
+        try:
+            data = await jwxt_adapter.get_schedule(ctx.deps.session, term, week)
+        except ApiError as exc:
+            return _record_failure(ctx, "query_schedule", exc.message)
+        _record_success(ctx, "query_schedule", data)
+        return data
+
+    @agent.tool
+    async def query_classroom_schedule(
+        ctx: RunContext[AgentDeps],
+        term: Annotated[
+            str, Field(description="学期，格式 YYYY-YYYY-1 或 YYYY-YYYY-2")
+        ],
+        campus: str = Field(default="", description="校区代码，可为空"),
+        building: str = Field(default="", description="教学楼代码，可为空"),
+        start_week: int | None = Field(default=None, description="起始周次"),
+        end_week: int | None = Field(default=None, description="结束周次"),
+    ) -> dict[str, Any]:
+        """查询教室课表：某校区/教学楼内各教室的占用课程，用于找空教室或查某教室的课。"""
+        try:
+            data = await jwxt_adapter.get_classroom_schedule(
+                ctx.deps.session,
+                term,
+                campus=campus,
+                building=building,
+                start_week=start_week,
+                end_week=end_week,
+            )
+        except ApiError as exc:
+            return _record_failure(ctx, "query_classroom_schedule", exc.message)
+        _record_success(ctx, "query_classroom_schedule", data)
+        return data
+
+    @agent.tool
+    async def query_grades(
+        ctx: RunContext[AgentDeps],
+        term: str | None = Field(
+            default=None,
+            description="按学期过滤，格式 YYYY-YYYY-1；不传表示查询全部学期成绩",
+        ),
+    ) -> dict[str, Any]:
+        """查询当前登录学生的成绩列表、学分与绩点统计。"""
+        try:
+            data = await jwxt_adapter.get_grades(ctx.deps.session, term)
+        except ApiError as exc:
+            return _record_failure(ctx, "query_grades", exc.message)
+        _record_success(ctx, "query_grades", data)
+        return data
+
+    @agent.tool
+    async def query_grade_detail(
+        ctx: RunContext[AgentDeps],
+        index: Annotated[
+            int,
+            Field(
+                description="成绩列表中该科目的 index 编号（必须先调用 query_grades 获取）"
+            ),
+        ],
+    ) -> dict[str, Any]:
+        """查询单科成绩明细（平时/期中/期末占比与分数）。需要先查询过成绩列表。"""
+        try:
+            data = await jwxt_adapter.get_grade_detail(ctx.deps.session, index)
+        except ApiError as exc:
+            return _record_failure(ctx, "query_grade_detail", exc.message)
+        _record_success(ctx, "query_grade_detail", data)
+        return data
+
+    @agent.tool
+    async def query_training_plan(ctx: RunContext[AgentDeps]) -> dict[str, Any]:
+        """查询当前登录学生所在专业的培养方案课程列表（课程、学分、属性）。"""
+        try:
+            data = await jwxt_adapter.get_training_plan(ctx.deps.session)
+        except ApiError as exc:
+            return _record_failure(ctx, "query_training_plan", exc.message)
+        _record_success(ctx, "query_training_plan", data)
+        return data
+
+    @agent.tool
+    async def search_knowledge(
+        ctx: RunContext[AgentDeps],
+        query: Annotated[
+            str, Field(description="要在学院知识库中检索的问题或关键词")
+        ],
+    ) -> dict[str, Any]:
+        """检索学院知识库：学生手册、培养方案说明、制度流程、社团工作室信息等。"""
+        service = ctx.deps.knowledge
+        if service is None:
+            return _record_failure(ctx, "search_knowledge", "知识库尚未初始化")
+        results = service.search(query, top_k=3)
+        if not results:
+            return _record_failure(
+                ctx, "search_knowledge", "当前知识库没有找到相关依据"
+            )
+        ctx.deps.sources.extend(
+            f"{r.source}#{r.title}" for r in results
+        )
+        data = {
+            "query": query,
+            "results": [
+                {"text": r.text, "source": r.source, "title": r.title} for r in results
+            ],
+        }
+        _record_success(ctx, "search_knowledge", data)
+        return data
+
+    @agent.tool
+    async def search_information(
+        ctx: RunContext[AgentDeps],
+        query: Annotated[
+            str, Field(description="要检索的学院网站资讯或竞赛信息关键词")
+        ],
+    ) -> dict[str, Any]:
+        """检索学院网站资讯与竞赛平台信息（当前为静态导入数据）。"""
+        service = ctx.deps.information
+        if service is None:
+            return _record_failure(ctx, "search_information", "资讯库尚未初始化")
+        results = service.search(query, top_k=3)
+        if not results:
+            return _record_failure(
+                ctx, "search_information", "当前资讯库没有找到相关依据"
+            )
+        ctx.deps.sources.extend(f"{r.source}#{r.title}" for r in results)
+        data = {
+            "query": query,
+            "results": [
+                {"text": r.text, "source": r.source, "title": r.title} for r in results
+            ],
+        }
+        _record_success(ctx, "search_information", data)
+        return data
+
+
+__all__ = ["RESULT_TYPES", "AgentDeps", "register_tools"]

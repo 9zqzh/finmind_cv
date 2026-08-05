@@ -157,7 +157,7 @@ def register_tools(agent: Agent) -> None:
             str, Field(description="要在学院知识库中检索的问题或关键词")
         ],
     ) -> dict[str, Any]:
-        """检索学院知识库：学生手册、培养方案说明、制度流程、社团工作室信息等。"""
+        """检索学院知识库：学生手册、培养方案说明、制度流程、社团工作室信息等。仅当用户消息中明确包含"知识库"字样时才允许调用；其他任何情况（即使问题涉及制度流程、培养方案）都不得调用。"""
         service = ctx.deps.knowledge
         if service is None:
             return _record_failure(ctx, "search_knowledge", "知识库尚未初始化")
@@ -185,7 +185,7 @@ def register_tools(agent: Agent) -> None:
             str, Field(description="要检索的学院网站资讯或竞赛信息关键词")
         ],
     ) -> dict[str, Any]:
-        """检索学院网站资讯与竞赛平台信息（当前为静态导入数据）。"""
+        """检索学院网站资讯与竞赛平台信息（当前为静态导入数据）。仅当用户消息中明确提到"资讯"时才允许调用；其他任何情况都不得调用。"""
         service = ctx.deps.information
         if service is None:
             return _record_failure(ctx, "search_information", "资讯库尚未初始化")

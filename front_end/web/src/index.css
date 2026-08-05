@@ -2,9 +2,95 @@ body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-  background: #f5f7fa;
+  color: #1d2939;
+  background: #f5f9ff;
 }
 
 #root {
   min-height: 100vh;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.schedule-grid-scroll {
+  overflow-x: auto;
+  border: 1px solid #d9e8f7;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.schedule-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 96px);
+  width: max-content;
+}
+
+.schedule-grid__row {
+  display: contents;
+}
+
+.schedule-grid__cell {
+  min-width: 0;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  padding: 6px;
+  border-right: 1px solid #d9e8f7;
+  border-bottom: 1px solid #d9e8f7;
+}
+
+.schedule-grid__cell:nth-child(8n) {
+  border-right: 0;
+}
+
+.schedule-grid__cell--corner,
+.schedule-grid__cell--header,
+.schedule-grid__cell--period {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #164b80;
+  font-weight: 600;
+  font-size: 14px;
+  background: #eef7ff;
+}
+
+.schedule-grid__cell--course {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #ffffff;
+  overflow-y: auto;
+}
+
+.schedule-grid__course {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px;
+  border-left: 0;
+  background: #f5f9ff;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.schedule-grid__course:hover,
+.schedule-grid__course--selected {
+  background: #e6f4ff;
+  box-shadow: 0 0 0 1px #91caff inset;
+}
+
+.schedule-grid__course .ant-typography {
+  margin: 0;
+  line-height: 1.35;
+  font-size: 11px;
+  word-break: break-word;
+}
+
+.schedule-grid__empty {
+  align-self: center;
+  margin: auto;
+  color: #98a2b3;
 }

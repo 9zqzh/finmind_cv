@@ -1,16 +1,26 @@
-import { useState } from "react";
-import { Button, Card, Input, message, Space, Table, Typography } from "antd";
+import { useEffect, useMemo, useState } from "react";
+import { Button, Card, Input, message, Select, Space, Table, Typography } from "antd";
 import { api, ApiBizError } from "../api/client";
 import type { ClassroomEntry, ClassroomSchedule } from "../api/types";
+import { useAuth } from "../context/AuthContext";
+import { getDefaultTerm, getTermOptions } from "../utils/terms";
 
 const WEEKDAY_NAMES = ["", "周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 
 export default function ClassroomSchedulePage() {
-  const [term, setTerm] = useState("2025-2026-2");
+  const { username } = useAuth();
+  const termOptions = useMemo(() => getTermOptions(username), [username]);
+  const [term, setTerm] = useState("");
   const [campus, setCampus] = useState("");
   const [building, setBuilding] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ClassroomSchedule | null>(null);
+
+  useEffect(() => {
+    if (!termOptions.some((option) => option.value === term)) {
+      setTerm(getDefaultTerm(username));
+    }
+  }, [term, termOptions, username]);
 
   const query = async () => {
     if (!term.trim()) {
@@ -75,10 +85,11 @@ export default function ClassroomSchedulePage() {
           按校区/教学楼查询某学期该教学楼内所有教室的上课安排（参数可留空查全部）。
         </Typography.Text>
         <Space wrap>
-          <Input
+          <Select
             value={term}
-            onChange={(e) => setTerm(e.target.value)}
-            placeholder="学期，如 2025-2026-2"
+            options={termOptions}
+            onChange={setTerm}
+            placeholder="选择学期"
             style={{ width: 180 }}
           />
           <Input
@@ -104,6 +115,7 @@ export default function ClassroomSchedulePage() {
             dataSource={result.items}
             size="small"
             pagination={{ pageSize: 20 }}
+            bordered
             scroll={{ x: 800 }}
           />
         )}

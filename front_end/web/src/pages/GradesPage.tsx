@@ -1,18 +1,22 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Button,
   Card,
   Descriptions,
-  Input,
   message,
+  Select,
   Space,
   Table,
   Tag,
 } from "antd";
 import { api, ApiBizError } from "../api/client";
 import type { GradeReport } from "../api/types";
+import { useAuth } from "../context/AuthContext";
+import { getTermOptions } from "../utils/terms";
 
 export default function GradesPage() {
+  const { username } = useAuth();
+  const termOptions = useMemo(() => getTermOptions(username), [username]);
   const [term, setTerm] = useState("");
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState<GradeReport | null>(null);
@@ -32,10 +36,11 @@ export default function GradesPage() {
   return (
     <Card title="成绩查询">
       <Space style={{ marginBottom: 16 }}>
-        <Input
+        <Select
           value={term}
-          onChange={(e) => setTerm(e.target.value)}
-          placeholder="按学期过滤（可选），如 2025-2026-1"
+          onChange={setTerm}
+          options={[{ label: "全部学期", value: "" }, ...termOptions]}
+          placeholder="按学期过滤（可选）"
           style={{ width: 240 }}
         />
         <Button type="primary" onClick={query} loading={loading}>
@@ -63,6 +68,8 @@ export default function GradesPage() {
             rowKey="index"
             dataSource={report.items}
             pagination={{ pageSize: 15, hideOnSinglePage: true }}
+            bordered
+            scroll={{ x: 900 }}
             columns={[
               { title: "课程", dataIndex: "course_name" },
               { title: "学期", dataIndex: "term", width: 120 },

@@ -1,4 +1,6 @@
 import { useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   Avatar,
   Button,
@@ -215,11 +217,18 @@ export default function ChatPage() {
                   background: msg.role === "user" ? "#e6f4ff" : "#fff",
                   padding: "10px 14px",
                   borderRadius: 10,
-                  whiteSpace: "pre-wrap",
                   border: "1px solid #f0f0f0",
                 }}
               >
-                {msg.text}
+                {msg.role === "user" ? (
+                  <span style={{ whiteSpace: "pre-wrap" }}>{msg.text}</span>
+                ) : (
+                  <div className="markdown-body">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {msg.text}
+                    </ReactMarkdown>
+                  </div>
+                )}
               </div>
               {msg.chat && (
                 <div style={{ marginTop: 8 }}>

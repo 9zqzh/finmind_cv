@@ -4,6 +4,7 @@ import { Button, Card, Form, Input, message, Typography } from "antd";
 import { ReloadOutlined, UserOutlined, LockOutlined, SafetyOutlined } from "@ant-design/icons";
 import { api, setToken, ApiBizError } from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import logo from "../assets/logo.jpg";
 
 interface CaptchaState {
   token: string;
@@ -85,9 +86,16 @@ export default function LoginPage() {
       }}
     >
       <Card style={{ width: 400, boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
-        <Typography.Title level={3} style={{ textAlign: "center" }}>
-          🎓 学院教学小助手
-        </Typography.Title>
+        <div style={{ textAlign: "center" }}>
+          <img
+            src={logo}
+            alt="学院教学小助手 Logo"
+            style={{ width: 64, height: 64, objectFit: "contain", borderRadius: 16 }}
+          />
+          <Typography.Title level={3} style={{ marginTop: 12, marginBottom: 4 }}>
+            学院教学小助手
+          </Typography.Title>
+        </div>
         <Typography.Paragraph type="secondary" style={{ textAlign: "center" }}>
           请使用教务系统账号登录
         </Typography.Paragraph>

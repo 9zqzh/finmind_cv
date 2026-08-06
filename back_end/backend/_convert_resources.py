@@ -46,6 +46,19 @@ def clean_text(text: str) -> str:
 _SECTION_START = re.compile(r"^[一二三四五六七八九十\d（(【\[]")
 _SENTENCE_END = "。；：！？）】”"
 
+# 制度类文档结构化：章/条标题提升为 Markdown 标题与独立段落，让检索按条款分块
+_PAGE_NUM_RE = re.compile(r"^-\s*\d+\s*-", re.MULTILINE)
+_CHAPTER_RE = re.compile(r"(第[一二三四五六七八九十百]+章\s*[^\n第]{1,20})")
+_ARTICLE_RE = re.compile(r"(第[一二三四五六七八九十百]+条)")
+
+
+def structure_policy_text(text: str) -> str:
+    """为制度类文本补充结构：去页码、章提升为标题、条款独立成段。"""
+    text = _PAGE_NUM_RE.sub("", text)
+    text = _CHAPTER_RE.sub(r"\n## \1\n", text)
+    text = _ARTICLE_RE.sub(r"\n\n\1", text)
+    return text
+
 
 def join_wrapped_lines(text: str) -> str:
     """把 PDF 提取出的句中断行拼接回完整句子（启发式）。"""
@@ -75,6 +88,10 @@ def pdf_to_markdown(pdf_path: Path, title: str) -> str:
         if page_text:
             parts.append(f"<!-- 第 {i} 页 -->\n\n{page_text}")
     body = clean_text("\n\n".join(parts))
+    # 制度细则类文档（含“第X章/第X条”）做结构化处理，便于按条款分块检索
+    if _CHAPTER_RE.search(body) or _ARTICLE_RE.search(body):
+        body = structure_policy_text(body)
+        body = clean_text(body)
     aliases = ALIASES.get(title)
     if aliases:
         body += "\n\n相关关键词：" + "、".join(aliases)

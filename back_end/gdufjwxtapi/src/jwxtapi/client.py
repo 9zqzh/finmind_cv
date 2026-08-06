@@ -20,6 +20,7 @@ from .exceptions import (
 )
 from .models import (
     CaptchaImage,
+    ClassroomGrid,
     ClassroomSchedule,
     Grade,
     GradeDetail,
@@ -31,6 +32,7 @@ from .models import (
 )
 from .parsers import (
     parse_classroom_entries,
+    parse_classroom_grid,
     parse_grade_detail,
     parse_grades,
     parse_schedule,
@@ -244,6 +246,42 @@ class JwxtClient:
                 end_period=end_period,
                 items=parse_classroom_entries(response.text),
             )
+
+    def get_classroom_grid(
+        self,
+        term: str,
+        department: str = "",
+        campus: str = "",
+        building: str = "",
+        start_week: int | None = None,
+        end_week: int | None = None,
+        start_period: int | None = None,
+        end_period: int | None = None,
+    ) -> ClassroomGrid:
+        """查询教室课表网格：全量教室清单 + 占用条目（供空闲教室筛选）。"""
+        with self._lock:
+            self._require_login()
+            self._validate_term(term)
+            self._validate_range("周次", start_week, end_week, 30)
+            max_period = self._get_max_period(term) if start_period is not None or end_period is not None else 99
+            self._validate_range("节次", start_period, end_period, max_period)
+            response = self._request(
+                "POST",
+                "/jsxsd/kbcx/kbxx_classroom_ifr",
+                data={
+                    "xnxqh": term,
+                    "skyx": department,
+                    "xqid": campus,
+                    "jzwid": building,
+                    "zc1": "" if start_week is None else str(start_week),
+                    "zc2": "" if end_week is None else str(end_week),
+                    "jc1": "" if start_period is None else f"{start_period:02d}",
+                    "jc2": "" if end_period is None else f"{end_period:02d}",
+                },
+                follow_redirects=True,
+            )
+            self._raise_if_session_expired(response)
+            return parse_classroom_grid(response.text)
 
     def get_grades(self, extra_form: Mapping[str, str] | None = None) -> GradeReport:
         with self._lock:

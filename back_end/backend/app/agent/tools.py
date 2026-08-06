@@ -23,6 +23,7 @@ from app.services.session import JwxtSession
 RESULT_TYPES: dict[str, str] = {
     "query_schedule": "schedule",
     "query_classroom_schedule": "classroom_schedule",
+    "query_empty_classrooms": "empty_classrooms",
     "query_grades": "grades",
     "query_grade_detail": "grade_detail",
     "query_training_plan": "training_plan",
@@ -91,7 +92,7 @@ def register_tools(agent: Agent) -> None:
         start_week: int | None = Field(default=None, description="起始周次"),
         end_week: int | None = Field(default=None, description="结束周次"),
     ) -> dict[str, Any]:
-        """查询教室课表：某校区/教学楼内各教室的占用课程，用于找空教室或查某教室的课。"""
+        """查询教室课表：某校区/教学楼内各教室的占用课程详情（数据量大）。仅用于查询具体教室的课程安排；若用户想找空闲教室，请改用 query_empty_classrooms，它只返回空闲教室名单，更简洁。"""
         try:
             data = await jwxt_adapter.get_classroom_schedule(
                 ctx.deps.session,
@@ -104,6 +105,38 @@ def register_tools(agent: Agent) -> None:
         except ApiError as exc:
             return _record_failure(ctx, "query_classroom_schedule", exc.message)
         _record_success(ctx, "query_classroom_schedule", data)
+        return data
+
+    @agent.tool
+    async def query_empty_classrooms(
+        ctx: RunContext[AgentDeps],
+        term: Annotated[
+            str, Field(description="学期，格式 YYYY-YYYY-1 或 YYYY-YYYY-2")
+        ],
+        weekday: int = Field(
+            description="星期几，1-7（1 为星期一，7 为星期日）"
+        ),
+        start_period: int = Field(description="起始节次，如上午第一大节为 1"),
+        end_period: int = Field(description="结束节次，如上午第二大节为 4"),
+        campus: str = Field(default="", description="校区代码，可为空"),
+        building: str = Field(default="", description="教学楼代码，可为空"),
+        week: int | None = Field(default=None, description="周次，如第 3 周传 3；不传表示不限周次"),
+    ) -> dict[str, Any]:
+        """查询空闲教室：返回指定学期/校区/教学楼在指定星期、节次（可选周次）内没有课程占用的教室名单。只返回空闲教室名称列表与数量，不包含课程详情；用户想找空教室自习、讨论或活动时优先使用本工具。若查询条件缺少星期或节次，请先向用户确认。注意：本工具结果仅供你组织回复，前端不会展示原始数据，请用自然语言汇总空闲教室，不要输出 JSON。"""
+        try:
+            data = await jwxt_adapter.get_empty_classrooms(
+                ctx.deps.session,
+                term,
+                campus=campus,
+                building=building,
+                weekday=weekday,
+                week=week,
+                start_period=start_period,
+                end_period=end_period,
+            )
+        except ApiError as exc:
+            return _record_failure(ctx, "query_empty_classrooms", exc.message)
+        _record_success(ctx, "query_empty_classrooms", data)
         return data
 
     @agent.tool

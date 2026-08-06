@@ -21,11 +21,19 @@ from app.services.session import ChatTurn, JwxtSession
 
 _AGENT: Agent | None = None
 
-# 知识库/资讯类结果在对话界面只呈现文字总结，不渲染文档卡片、不展示源文件名
-_TEXT_ONLY_RESULT_TYPES = {"knowledge", "information"}
+# 以下结果在对话界面只呈现文字总结，不渲染结构化卡片、不把原始数据发给前端：
+# - knowledge/information：不展示知识库 markdown 原文卡片与源文件清单
+# - empty_classrooms：空闲教室名单已由模型用自然语言汇总，不渲染原始 JSON
+_TEXT_ONLY_RESULT_TYPES = {"knowledge", "information", "empty_classrooms"}
 
 # 对话记忆滑动窗口：最多保留最近 6 轮（12 条消息），超出丢弃最早轮次
 HISTORY_MAX_TURNS = 6
+
+
+def _event_result_type(event: dict) -> str:
+    """工具事件的对外结果类型：纯文本降级类统一规范化为 text，避免泄露到前端 schema。"""
+    result_type = event.get("result_type", "text")
+    return "text" if result_type in _TEXT_ONLY_RESULT_TYPES else result_type
 
 
 def get_agent(settings: Settings | None = None) -> Agent:
@@ -79,14 +87,14 @@ async def run_chat(
     tool_calls = [
         ToolCallInfo(
             tool=event["tool"],
-            result_type=event.get("result_type", "text"),
+            result_type=_event_result_type(event),
         )
         for event in deps.tool_events
     ]
     result_type = deps.last_result_type if deps.tool_events else "text"
     if result_type in _TEXT_ONLY_RESULT_TYPES:
-        # 检索类结果降级为纯文本：Agent 的 answer 已包含总结提炼内容，
-        # 不再把知识库 markdown 原文卡片与源文件清单返回到对话界面
+        # 此类结果降级为纯文本：Agent 的 answer 已包含总结提炼内容，
+        # 不再把原始结构化数据（如空闲教室 JSON、知识库原文）返回到对话界面
         result_type = "text"
         data = None
         sources: list[str] = []
@@ -186,7 +194,7 @@ async def run_chat_stream(
                     tool_calls = [
                         ToolCallInfo(
                             tool=evt["tool"],
-                            result_type=evt.get("result_type", "text"),
+                            result_type=_event_result_type(evt),
                         )
                         for evt in deps.tool_events
                     ]

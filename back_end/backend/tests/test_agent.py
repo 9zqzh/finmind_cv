@@ -17,10 +17,10 @@ def _build_test_agent() -> Agent:
     return agent
 
 
-def test_all_seven_tools_registered():
+def test_all_tools_registered():
     agent = _build_test_agent()
     names = set(RESULT_TYPES.keys())
-    assert len(names) == 7
+    assert len(names) == 8
     # 通过 agent 的 toolset 检查已注册工具名
     registered: set[str] = set()
     for toolset in getattr(agent, "_user_toolsets", []):

@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup, Tag
 from .exceptions import ParseError
 from .models import (
     ClassroomEntry,
+    ClassroomGrid,
     Grade,
     GradeDetail,
     GradeReport,
@@ -129,7 +130,8 @@ def parse_schedule(html: str, requested_term: str, requested_week: int | None) -
     return Schedule(selected_term, requested_week, tuple(entries), remarks)
 
 
-def parse_classroom_entries(html: str) -> tuple[ClassroomEntry, ...]:
+def _classroom_grid_parts(html: str) -> tuple[list[str], list[ClassroomEntry]]:
+    """解析教室课表网格：返回（全量教室清单，占用条目列表）。"""
     soup = _soup(html)
     table = soup.select_one("#kbtable")
     if table is None:
@@ -143,12 +145,14 @@ def parse_classroom_entries(html: str) -> tuple[ClassroomEntry, ...]:
         raise ParseError("教室课表节次列数量无效")
     periods_per_day = len(all_periods) // 7
     period_names = all_periods[:periods_per_day]
+    classrooms: list[str] = []
     entries: list[ClassroomEntry] = []
     for row in rows[2:]:
         cells = row.find_all("td", recursive=False)
         if not cells:
             continue
         classroom = _cell_text(cells[0])
+        classrooms.append(classroom)
         slot = 0
         for cell in cells[1:]:
             colspan = int(str(cell.get("colspan", "1")))
@@ -181,7 +185,18 @@ def parse_classroom_entries(html: str) -> tuple[ClassroomEntry, ...]:
                     )
                 )
             slot += colspan
+    return classrooms, entries
+
+
+def parse_classroom_entries(html: str) -> tuple[ClassroomEntry, ...]:
+    _, entries = _classroom_grid_parts(html)
     return tuple(entries)
+
+
+def parse_classroom_grid(html: str) -> ClassroomGrid:
+    """解析教室课表网格，同时返回全量教室清单与占用条目（供空闲教室筛选）。"""
+    classrooms, entries = _classroom_grid_parts(html)
+    return ClassroomGrid(classrooms=tuple(classrooms), entries=tuple(entries))
 
 
 def _data_rows(html: str, expected_headers: Iterable[str]) -> tuple[BeautifulSoup, list[Tag]]:
@@ -241,12 +256,13 @@ def parse_grades(html: str) -> GradeReport:
         page_text,
     )
     if summary:
+        # 教务页面可能在数值末尾带中文句号（如辅修绩点"0。"），统一去掉尾部标点
         summary_values: tuple[str | None, str | None, str | None, str | None, str | None] = (
-            summary.group(1),
-            summary.group(2),
-            summary.group(3),
-            summary.group(4),
-            summary.group(5),
+            summary.group(1).strip("。."),
+            summary.group(2).strip("。."),
+            summary.group(3).strip("。."),
+            summary.group(4).strip("。."),
+            summary.group(5).strip("。."),
         )
     else:
         summary_values = (None, None, None, None, None)

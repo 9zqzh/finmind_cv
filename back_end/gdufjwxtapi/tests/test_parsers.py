@@ -1,5 +1,6 @@
 from jwxtapi.parsers import (
     parse_classroom_entries,
+    parse_classroom_grid,
     parse_grade_detail,
     parse_grades,
     parse_schedule,
@@ -53,6 +54,24 @@ def test_parse_classroom_schedule_grid() -> None:
     assert items[0].class_name == "软件工程1班"
 
 
+def test_parse_classroom_grid_lists_all_classrooms() -> None:
+    """网格解析应同时返回全量教室清单（含无课的教室）与占用条目。"""
+    periods = "".join(f"<td>{period}</td>" for _ in range(7) for period in ("0102", "0304"))
+    empty = "<td>&nbsp;</td>" * 14
+    html = f"""
+    <table id="kbtable">
+      <tr><th></th>{''.join('<th colspan="2">星期</th>' for _ in range(7))}</tr>
+      <tr><td>教室\\节次</td>{periods}</tr>
+      <tr><td>清远敏学101</td>{empty}</tr>
+      <tr><td>清远敏学102</td>{empty}<td><div class="kbcontent1">设计模式<br>叶东东<br>(1-16周)<br>软件工程1班</div></td></tr>
+    </table>
+    """
+    grid = parse_classroom_grid(html)
+    assert grid.classrooms == ("清远敏学101", "清远敏学102")
+    assert len(grid.entries) == 1
+    assert grid.entries[0].classroom == "清远敏学102"
+
+
 def test_parse_grades_and_detail_link() -> None:
     html = """
     <p>一共需要修读<span>225</span>学分，已修读<span>110</span>学分，还需修读<span>115</span>学分，
@@ -65,6 +84,8 @@ def test_parse_grades_and_detail_link() -> None:
     report = parse_grades(html)
     assert report.required_credits == "225"
     assert report.major_gpa == "2.66"
+    # 教务页面原文为"0。"，尾部中文句号应被去除
+    assert report.minor_gpa == "0"
     assert report.items[0].detail_total_score == "优秀"
     assert report.items[0].has_detail
 

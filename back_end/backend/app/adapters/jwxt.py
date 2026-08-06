@@ -130,6 +130,85 @@ async def get_classroom_schedule(
     return schedule.to_dict()
 
 
+def _period_code_range(code: str) -> tuple[int, int] | None:
+    """把节次代码（如 '0102'）解析为起止节次 (1, 2)；无法解析返回 None。"""
+    digits = [ch for ch in code if ch.isdigit()]
+    if len(digits) < 2:
+        return None
+    try:
+        start = int("".join(digits[: len(digits) // 2]))
+        end = int("".join(digits[len(digits) // 2 :]))
+    except ValueError:
+        return None
+    if start <= 0 or end < start:
+        return None
+    return start, end
+
+
+async def get_empty_classrooms(
+    session: JwxtSession,
+    term: str,
+    campus: str = "",
+    building: str = "",
+    weekday: int | None = None,
+    week: int | None = None,
+    start_period: int | None = None,
+    end_period: int | None = None,
+) -> dict[str, Any]:
+    """查询指定时间段内的空闲教室名单（只返回名单，不返回课程详情）。
+
+    实现：调用教室课表网格接口拿到全量教室 + 占用条目，在指定星期/节次
+    内有课的教室记为占用，其余即空闲。周次过滤由接口自身完成。
+    """
+    require_login(session)
+    grid = await run_jwxt(
+        lambda: session.client.get_classroom_grid(
+            term=term,
+            campus=campus,
+            building=building,
+            start_week=week,
+            end_week=week,
+            start_period=start_period,
+            end_period=end_period,
+        )
+    )
+
+    requested = (
+        (start_period, end_period or start_period)
+        if start_period is not None
+        else None
+    )
+    occupied: set[str] = set()
+    for entry in grid.entries:
+        if weekday is not None and entry.weekday != weekday:
+            continue
+        if requested is not None:
+            span = _period_code_range(entry.period)
+            if span is not None and not (span[0] <= requested[1] and span[1] >= requested[0]):
+                continue
+        occupied.add(entry.classroom)
+
+    free = [c for c in grid.classrooms if c not in occupied]
+    return {
+        "term": term,
+        "campus": campus,
+        "building": building,
+        "weekday": weekday,
+        "week": week,
+        "start_period": start_period,
+        "end_period": end_period,
+        "total_classrooms": len(grid.classrooms),
+        "free_count": len(free),
+        "free_classrooms": free,
+        "occupied_count": len(occupied),
+        "message": (
+            "该时间段没有空闲教室，建议换个时间段或教学楼再查。"
+            if not free
+            else ""
+        ),
+    }
+
+
 async def get_grades(session: JwxtSession, term: str | None = None) -> dict[str, Any]:
     """查询成绩列表；term 传入时按学期过滤条目。"""
     require_login(session)

@@ -20,7 +20,7 @@ from gduf_web_api.models import (
 if TYPE_CHECKING:
     from gduf_web_api.adapters.base import SourceAdapter
 
-DEFAULT_USER_AGENT = "gduf-web-api/0.1.0 (+https://pypi.org/project/gduf-web-api/)"
+DEFAULT_USER_AGENT = "gduf-web-api/0.1.1 (+https://pypi.org/project/gduf-web-api/)"
 
 
 class GdufClient:

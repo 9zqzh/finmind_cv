@@ -12,6 +12,8 @@ pip install gduf-web-api
 
 需要 Python 3.10 或更高版本。
 
+仓库根目录的 [`example.py`](example.py) 包含新闻、详情、教师、学院简介、专业介绍和搜索的完整调用示例。
+
 ## 快速开始
 
 ```python
@@ -122,4 +124,3 @@ twine check dist/*
 ## License
 
 [MIT](LICENSE)
-

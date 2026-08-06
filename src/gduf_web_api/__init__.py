@@ -29,7 +29,7 @@ from gduf_web_api.errors import (
 )
 from gduf_web_api.models import AiHome, ArticleSummary, ContentDetail, PageResult, PersonSummary
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 __all__ = [
     "AiHome",
@@ -61,4 +61,3 @@ __all__ = [
     "get_ai_zrjs",
     "search_ai",
 ]
-

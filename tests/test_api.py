@@ -209,7 +209,7 @@ def test_client_context_closes() -> None:
 
 
 def test_version_and_exports() -> None:
-    assert api.__version__ == "0.1.0"
+    assert api.__version__ == "0.1.1"
     expected = {
         "get_ai_xyxw",
         "get_ai_xshuhd",

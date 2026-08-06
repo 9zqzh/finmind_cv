@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gduf-web-api"
-version = "0.1.0"
-description = "A typed, unofficial Python client for public Guangdong University of Finance college websites."
+version = "0.1.1"
+description = "广东金融学院各学院公开网站的类型化非官方 Python 客户端。"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
@@ -48,6 +48,7 @@ include = [
   "/tests",
   "/README.md",
   "/LICENSE",
+  "/example.py",
   "/pyproject.toml",
 ]
 
@@ -69,4 +70,3 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 python_version = "3.10"
 strict = true
 packages = ["gduf_web_api"]
-

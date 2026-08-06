@@ -20,6 +20,9 @@ from app.services.session import JwxtSession
 
 _AGENT: Agent | None = None
 
+# 知识库/资讯类结果在对话界面只呈现文字总结，不渲染文档卡片、不展示源文件名
+_TEXT_ONLY_RESULT_TYPES = {"knowledge", "information"}
+
 
 def get_agent(settings: Settings | None = None) -> Agent:
     """获取全局 Agent 单例（懒加载，避免无密钥时导入失败）。"""
@@ -67,11 +70,21 @@ async def run_chat(
         )
         for event in deps.tool_events
     ]
+    result_type = deps.last_result_type if deps.tool_events else "text"
+    if result_type in _TEXT_ONLY_RESULT_TYPES:
+        # 检索类结果降级为纯文本：Agent 的 answer 已包含总结提炼内容，
+        # 不再把知识库 markdown 原文卡片与源文件清单返回到对话界面
+        result_type = "text"
+        data = None
+        sources: list[str] = []
+    else:
+        data = deps.last_data if deps.tool_events else None
+        sources = deps.sources
     return ChatResponse(
         answer=str(result.output),
         intent=deps.last_result_type if deps.tool_events else "chat",
         tool_calls=tool_calls,
-        result_type=deps.last_result_type if deps.tool_events else "text",
-        data=deps.last_data if deps.tool_events else None,
-        sources=deps.sources,
+        result_type=result_type,
+        data=data,
+        sources=sources,
     )

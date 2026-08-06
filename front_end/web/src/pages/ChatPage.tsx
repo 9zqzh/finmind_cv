@@ -173,11 +173,8 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [expandedThinking, setExpandedThinking] = useState<Set<number>>(new Set());
-  const [questionList, setQuestionList] = useState<string[]>([]);
-  void setQuestionList;
   const listRef = useRef<HTMLDivElement>(null);
   const streamRef = useRef({ assistantIdx: 0, hasText: false });
-  const questionRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const toggleThinking = (idx: number) => {
     setExpandedThinking((prev) => {
@@ -197,7 +194,6 @@ export default function ChatPage() {
   const ask = async (question: string) => {
     if (!question.trim() || loading) return;
     setMessages((prev) => [...prev, { role: "user", text: question }]);
-    setQuestionList((prev) => [...prev, question]);
     setInput("");
 
     // 占位消息
@@ -397,61 +393,12 @@ export default function ChatPage() {
     }
   };
 
-  const [showIndex, setShowIndex] = useState(false);
 
-  const scrollToQuestion = (idx: number) => {
-    const el = questionRefs.current[idx];
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-    setShowIndex(false);
-  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 112px)" }}>
       <div ref={listRef} style={{ flex: 1, overflowY: "auto", padding: "8px 4px" }}>
-        {questionList.length > 0 && (
-          <div style={{ padding: "0 4px 8px", borderBottom: "1px solid #f0f0f0", marginBottom: 8 }}>
-            <div
-              onClick={() => setShowIndex(!showIndex)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                cursor: "pointer",
-                padding: "4px 0",
-                fontSize: 13,
-                color: "#1677ff",
-                userSelect: "none",
-              }}
-            >
-              <span style={{ fontSize: 12, transform: showIndex ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>▶</span>
-              对话索引（{questionList.length} 条）
-            </div>
-            {showIndex && (
-              <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 2 }}>
-                {questionList.map((q, j) => (
-                  <div
-                    key={j}
-                    onClick={() => scrollToQuestion(j)}
-                    style={{
-                      padding: "4px 8px",
-                      cursor: "pointer",
-                      fontSize: 12,
-                      color: "#475467",
-                      borderRadius: 4,
-                      lineHeight: 1.4,
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = "#f0f5ff"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                  >
-                    {j + 1}. {q.length > 30 ? q.slice(0, 30) + "..." : q}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+
           {messages.length === 0 && (
             <Card style={{ textAlign: "center", marginTop: 40 }}>
               <Typography.Title level={4}>👋 你好，我是学院教学小助手</Typography.Title>
@@ -470,11 +417,6 @@ export default function ChatPage() {
           {messages.map((msg, i) => (
             <div
               key={i}
-              ref={(el) => {
-                if (msg.role === "user") {
-                  questionRefs.current[i] = el;
-                }
-              }}
               style={{
                 display: "flex",
                 gap: 12,

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Button, Card, Input, message, Select, Space, Table, Typography } from "antd";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Button, Card, message, Select, Space, Table, Typography } from "antd";
 import { api, ApiBizError } from "../api/client";
 import type { ClassroomEntry, ClassroomSchedule } from "../api/types";
 import { useAuth } from "../context/AuthContext";
@@ -13,6 +13,8 @@ export default function ClassroomSchedulePage() {
   const [term, setTerm] = useState("");
   const [campus, setCampus] = useState("");
   const [building, setBuilding] = useState("");
+  const [buildingOptions, setBuildingOptions] = useState<{ label: string; value: string }[]>([]);
+  const [buildingsLoading, setBuildingsLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ClassroomSchedule | null>(null);
 
@@ -21,6 +23,33 @@ export default function ClassroomSchedulePage() {
       setTerm(getDefaultTerm(username));
     }
   }, [term, termOptions, username]);
+
+  const QY_KEEP = new Set(["清远北教", "清远南教", "清远敏学楼（实验楼）", "笃行楼（清远））"]);
+
+  const fetchBuildings = useCallback(async (campusCode: string) => {
+    if (!campusCode) {
+      setBuildingOptions([]);
+      setBuilding("");
+      return;
+    }
+    setBuildingsLoading(true);
+    try {
+      const options = await api.classroomBuildings(campusCode);
+      const filtered = campusCode === "r0"
+        ? options.filter((o) => QY_KEEP.has(o.label))
+        : options;
+      setBuildingOptions(filtered);
+      setBuilding("");
+    } catch {
+      setBuildingOptions([]);
+    } finally {
+      setBuildingsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchBuildings(campus);
+  }, [campus, fetchBuildings]);
 
   const query = async () => {
     if (!term.trim()) {
@@ -92,17 +121,27 @@ export default function ClassroomSchedulePage() {
             placeholder="选择学期"
             style={{ width: 180 }}
           />
-          <Input
-            value={campus}
-            onChange={(e) => setCampus(e.target.value)}
-            placeholder="校区（可留空）"
+          <Select
+            value={campus || undefined}
+            onChange={setCampus}
+            placeholder="选择校区"
+            allowClear
             style={{ width: 160 }}
+            options={[
+              { label: "广州校区", value: "1" },
+              { label: "肇庆校区", value: "2" },
+              { label: "清远校区", value: "r0" },
+            ]}
           />
-          <Input
+          <Select
             value={building}
-            onChange={(e) => setBuilding(e.target.value)}
-            placeholder="教学楼（可留空）"
+            onChange={setBuilding}
+            placeholder="选择教学楼"
+            allowClear
+            loading={buildingsLoading}
+            disabled={!campus}
             style={{ width: 160 }}
+            options={buildingOptions}
           />
           <Button type="primary" loading={loading} onClick={query}>
             查询

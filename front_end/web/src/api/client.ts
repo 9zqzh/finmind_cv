@@ -107,6 +107,12 @@ export const api = {
       .then(unwrap),
   trainingPlan: () =>
     client.get<ApiEnvelope<TrainingPlan>>("/api/training-plan").then(unwrap),
+  classroomBuildings: (campus: string) =>
+    client
+      .get<ApiEnvelope<{ label: string; value: string }[]>>("/api/classroom-buildings", {
+        params: { campus },
+      })
+      .then(unwrap),
   classroomSchedule: (params: {
     term: string;
     campus?: string;

@@ -22,6 +22,15 @@ async def schedule(
     return ok(await jwxt_adapter.get_schedule(session, term, week))
 
 
+@router.get("/classroom-buildings")
+async def classroom_buildings(
+    campus: str = Query(..., description="校区代码"),
+    session: JwxtSession = Depends(get_required_session),
+):
+    """获取教学楼列表。"""
+    return ok(await jwxt_adapter.get_buildings(session, campus))
+
+
 @router.get("/classroom-schedule")
 async def classroom_schedule(
     term: str = Query(..., description="学期，如 2025-2026-1"),

@@ -145,6 +145,13 @@ def _period_code_range(code: str) -> tuple[int, int] | None:
     return start, end
 
 
+async def get_buildings(session: JwxtSession, campus: str) -> list[dict[str, str]]:
+    """获取教学楼列表。"""
+    require_login(session)
+    options = await run_jwxt(lambda: session.client.get_buildings(campus=campus))
+    return [{"label": o.label, "value": o.value} for o in options]
+
+
 async def get_empty_classrooms(
     session: JwxtSession,
     term: str,

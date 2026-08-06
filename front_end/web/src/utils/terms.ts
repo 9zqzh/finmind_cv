@@ -37,6 +37,12 @@ export function getTermOptions(username: string | null): TermOption[] {
     }
   }
 
+  // 添加下一学期选项（如 2026-2027-1）
+  const nextSemester = `${currentStartYear + 1}-${currentStartYear + 2}-1`;
+  if (getCurrentTerm() < nextSemester) {
+    options.push({ label: nextSemester, value: nextSemester });
+  }
+
   return options.reverse();
 }
 

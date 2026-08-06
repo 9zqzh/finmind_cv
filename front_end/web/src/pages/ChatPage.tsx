@@ -1,6 +1,4 @@
 import { useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import {
   Avatar,
   Button,
@@ -13,16 +11,32 @@ import {
   Tag,
   Typography,
 } from "antd";
-import { RobotOutlined, SendOutlined, UserOutlined } from "@ant-design/icons";
-import { api, ApiBizError } from "../api/client";
+import {
+  BulbOutlined,
+  LoadingOutlined,
+  RobotOutlined,
+  SendOutlined,
+  UserOutlined,
+} from "@ant-design/icons";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { ApiBizError, getToken } from "../api/client";
 import type { ChatData } from "../api/types";
 
 interface ChatMessage {
   role: "user" | "assistant";
   text: string;
   chat?: ChatData;
+  thinkingContent?: string;
+  toolCalls?: ToolCallStep[];
 }
 
+interface ToolCallStep {
+  tool_name: string;
+  status: "calling" | "done";
+}
+
+/** 根据 result_type 推荐相关问题 */
 const QUICK_QUESTIONS = [
   "我今天有什么课？",
   "我这学期的成绩怎么样？",
@@ -143,11 +157,36 @@ function ResultCard({ chat }: { chat: ChatData }) {
   }
 }
 
+/** 解析 SSE 行 */
+function parseSSELine(line: string, currentEvent: string): { event: string; data: string } | null {
+  if (line.startsWith("event: ")) {
+    return { event: line.slice(7).trim(), data: "" };
+  }
+  if (line.startsWith("data: ")) {
+    return { event: currentEvent, data: line.slice(6) };
+  }
+  return null;
+}
+
 export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [expandedThinking, setExpandedThinking] = useState<Set<number>>(new Set());
+  const [questionList, setQuestionList] = useState<string[]>([]);
+  void setQuestionList;
   const listRef = useRef<HTMLDivElement>(null);
+  const streamRef = useRef({ assistantIdx: 0, hasText: false });
+  const questionRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  const toggleThinking = (idx: number) => {
+    setExpandedThinking((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -158,60 +197,357 @@ export default function ChatPage() {
   const ask = async (question: string) => {
     if (!question.trim() || loading) return;
     setMessages((prev) => [...prev, { role: "user", text: question }]);
+    setQuestionList((prev) => [...prev, question]);
     setInput("");
+
+    // 占位消息
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "assistant",
+        text: "",
+        thinkingContent: "",
+        toolCalls: [],
+      },
+    ]);
     setLoading(true);
     scrollToBottom();
+    streamRef.current.assistantIdx = messages.length + 1;
+
+    let accumulatedText = "";
+    let accumulatedThinking = "";
+    const toolCalls: ToolCallStep[] = [];
+    let hasReceivedText = false;
+    let finalChat: ChatData | null = null;
+    let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const flush = () => {
+      if (flushTimer) {
+        clearTimeout(flushTimer);
+        flushTimer = null;
+      }
+      setMessages((prev) => {
+        const updated = [...prev];
+        const last = updated[updated.length - 1];
+        if (last && last.role === "assistant") {
+          updated[updated.length - 1] = {
+            ...last,
+            text: accumulatedText,
+            thinkingContent: accumulatedThinking,
+            toolCalls: [...toolCalls],
+          };
+        }
+        return updated;
+      });
+      scrollToBottom();
+    };
+
+    const scheduleFlush = () => {
+      if (flushTimer) return;
+      flushTimer = setTimeout(() => {
+        flushTimer = null;
+        flush();
+      }, 50);
+    };
+
     try {
-      const chat = await api.chat(question);
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", text: chat.answer, chat },
-      ]);
+      const token = getToken();
+      const response = await fetch("/api/chat/stream", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "X-Session-Token": token } : {}),
+        },
+        body: JSON.stringify({ message: question }),
+      });
+
+      if (!response.ok || !response.body) {
+        throw new Error("请求失败");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let currentEvent = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed === "") continue;
+          const parsed = parseSSELine(trimmed, currentEvent);
+          if (!parsed) continue;
+
+          if (parsed.event) {
+            currentEvent = parsed.event;
+          }
+          if (parsed.data) {
+            const dataStr = parsed.data;
+            switch (currentEvent) {
+              case "thinking": {
+                const chunk = JSON.parse(dataStr);
+                accumulatedThinking += chunk;
+                // 思考过程中展开思考气泡
+                setExpandedThinking((prev) => {
+                  const next = new Set(prev);
+                  next.add(streamRef.current.assistantIdx);
+                  return next;
+                });
+                scheduleFlush();
+                break;
+              }
+              case "tool_call": {
+                const info = JSON.parse(dataStr);
+                toolCalls.push({ tool_name: info.tool_name, status: "calling" });
+                flush();
+                break;
+              }
+              case "tool_result": {
+                const info = JSON.parse(dataStr);
+                const idx = toolCalls.findIndex(
+                  (s) => s.tool_name === info.tool_name && s.status === "calling",
+                );
+                if (idx !== -1) {
+                  toolCalls[idx] = { ...toolCalls[idx], status: "done" };
+                  flush();
+                }
+                break;
+              }
+              case "text": {
+                const chunk = JSON.parse(dataStr);
+                if (!hasReceivedText) {
+                  hasReceivedText = true;
+                  // 开始输出正文时折叠思考气泡
+                  setExpandedThinking((prev) => {
+                    const next = new Set(prev);
+                    next.delete(streamRef.current.assistantIdx);
+                    return next;
+                  });
+                }
+                accumulatedText += chunk;
+                scheduleFlush();
+                break;
+              }
+              case "done": {
+                if (flushTimer) {
+                  clearTimeout(flushTimer);
+                  flushTimer = null;
+                }
+                const payload = JSON.parse(dataStr);
+                finalChat = payload as ChatData;
+                break;
+              }
+              case "error": {
+                const msg = JSON.parse(dataStr);
+                throw new Error(msg);
+              }
+            }
+          }
+        }
+      }
+
+      // 最终刷新
+      if (flushTimer) {
+        clearTimeout(flushTimer);
+        flushTimer = null;
+      }
+
+      if (finalChat) {
+        setMessages((prev) => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last && last.role === "assistant") {
+            updated[updated.length - 1] = {
+              role: "assistant",
+              text: finalChat!.answer,
+              chat: finalChat!,
+              thinkingContent: accumulatedThinking,
+              toolCalls: [...toolCalls],
+            };
+          }
+          return updated;
+        });
+      } else {
+        flush();
+      }
     } catch (error) {
       const msg = error instanceof ApiBizError ? error.message : "对话请求失败";
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", text: `⚠️ ${msg}` },
-      ]);
+      setMessages((prev) => {
+        const updated = [...prev];
+        const last = updated[updated.length - 1];
+        if (last && last.role === "assistant") {
+          updated[updated.length - 1] = {
+            ...last,
+            text: `⚠️ ${msg}`,
+            thinkingContent: accumulatedThinking,
+            toolCalls: [...toolCalls],
+          };
+        }
+        return updated;
+      });
     } finally {
       setLoading(false);
       scrollToBottom();
     }
   };
 
+  const [showIndex, setShowIndex] = useState(false);
+
+  const scrollToQuestion = (idx: number) => {
+    const el = questionRefs.current[idx];
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    setShowIndex(false);
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 112px)" }}>
       <div ref={listRef} style={{ flex: 1, overflowY: "auto", padding: "8px 4px" }}>
-        {messages.length === 0 && (
-          <Card style={{ textAlign: "center", marginTop: 40 }}>
-            <Typography.Title level={4}>👋 你好，我是学院教学小助手</Typography.Title>
-            <Typography.Paragraph type="secondary">
-              可以问我课表、成绩、培养方案、学院制度、竞赛信息等任何问题
-            </Typography.Paragraph>
-            <Space wrap>
-              {QUICK_QUESTIONS.map((q) => (
-                <Button key={q} size="small" onClick={() => ask(q)}>
-                  {q}
-                </Button>
-              ))}
-            </Space>
-          </Card>
+        {questionList.length > 0 && (
+          <div style={{ padding: "0 4px 8px", borderBottom: "1px solid #f0f0f0", marginBottom: 8 }}>
+            <div
+              onClick={() => setShowIndex(!showIndex)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                cursor: "pointer",
+                padding: "4px 0",
+                fontSize: 13,
+                color: "#1677ff",
+                userSelect: "none",
+              }}
+            >
+              <span style={{ fontSize: 12, transform: showIndex ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>▶</span>
+              对话索引（{questionList.length} 条）
+            </div>
+            {showIndex && (
+              <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 2 }}>
+                {questionList.map((q, j) => (
+                  <div
+                    key={j}
+                    onClick={() => scrollToQuestion(j)}
+                    style={{
+                      padding: "4px 8px",
+                      cursor: "pointer",
+                      fontSize: 12,
+                      color: "#475467",
+                      borderRadius: 4,
+                      lineHeight: 1.4,
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "#f0f5ff"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                  >
+                    {j + 1}. {q.length > 30 ? q.slice(0, 30) + "..." : q}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
-        {messages.map((msg, i) => (
-          <div
-            key={i}
-            style={{
-              display: "flex",
-              gap: 12,
-              marginBottom: 16,
-              flexDirection: msg.role === "user" ? "row-reverse" : "row",
-            }}
-          >
-            <Avatar
-              icon={msg.role === "user" ? <UserOutlined /> : <RobotOutlined />}
-              style={{ background: msg.role === "user" ? "#1677ff" : "#52c41a" }}
-            />
-            <div style={{ maxWidth: "78%" }}>
+          {messages.length === 0 && (
+            <Card style={{ textAlign: "center", marginTop: 40 }}>
+              <Typography.Title level={4}>👋 你好，我是学院教学小助手</Typography.Title>
+              <Typography.Paragraph type="secondary">
+                可以问我课表、成绩、培养方案、学院制度、竞赛信息等任何问题
+              </Typography.Paragraph>
+              <Space wrap>
+                {QUICK_QUESTIONS.map((q) => (
+                  <Button key={q} size="small" onClick={() => ask(q)}>
+                    {q}
+                  </Button>
+                ))}
+              </Space>
+            </Card>
+          )}
+          {messages.map((msg, i) => (
+            <div
+              key={i}
+              ref={(el) => {
+                if (msg.role === "user") {
+                  questionRefs.current[i] = el;
+                }
+              }}
+              style={{
+                display: "flex",
+                gap: 12,
+                marginBottom: 16,
+                flexDirection: msg.role === "user" ? "row-reverse" : "row",
+              }}
+            >
+              <Avatar
+                icon={msg.role === "user" ? <UserOutlined /> : <RobotOutlined />}
+                style={{ background: msg.role === "user" ? "#1677ff" : "#52c41a" }}
+              />
+              <div style={{ maxWidth: "78%" }}>
+              {/* 思考过程 */}
+              {msg.thinkingContent && (
+                <div
+                  style={{
+                    background: "#f0f5ff",
+                    border: "1px solid #d6e4ff",
+                    borderRadius: 8,
+                    marginBottom: 8,
+                    fontSize: 13,
+                    lineHeight: 1.6,
+                    color: "#1d2939",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    onClick={() => toggleThinking(i)}
+                    style={{
+                      padding: "8px 14px",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      userSelect: "none",
+                    }}
+                  >
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      <BulbOutlined style={{ marginRight: 4 }} />
+                      AI 思考过程
+                      <span style={{ marginLeft: 6, color: "#8c8c8c" }}>
+                        {expandedThinking.has(i) ? "（点击收起）" : "（点击展开）"}
+                      </span>
+                    </Typography.Text>
+                    <span style={{ fontSize: 12, color: "#8c8c8c", transform: expandedThinking.has(i) ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>
+                      ▼
+                    </span>
+                  </div>
+                  {expandedThinking.has(i) && (
+                    <div style={{ padding: "0 14px 10px" }}>
+                      <div style={{ whiteSpace: "pre-wrap" }}>{msg.thinkingContent}</div>
+                      {msg.toolCalls && msg.toolCalls.length > 0 && (
+                        <div style={{ marginTop: 8, borderTop: "1px dashed #d6e4ff", paddingTop: 6 }}>
+                          {msg.toolCalls.map((step, j) => (
+                            <div key={j} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                              {step.status === "calling" ? (
+                                <LoadingOutlined style={{ color: "#1677ff" }} />
+                              ) : (
+                                <span style={{ color: "#52c41a" }}>✅</span>
+                              )}
+                              <span style={{ color: step.status === "calling" ? "#1d2939" : "#5b6270" }}>
+                                {step.status === "calling" ? "正在调用：" : "已完成："}
+                                {step.tool_name}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+              {/* 回答气泡 */}
               <div
                 style={{
                   background: msg.role === "user" ? "#e6f4ff" : "#fff",
@@ -222,13 +558,15 @@ export default function ChatPage() {
               >
                 {msg.role === "user" ? (
                   <span style={{ whiteSpace: "pre-wrap" }}>{msg.text}</span>
-                ) : (
+                ) : msg.text ? (
                   <div className="markdown-body">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
                       {msg.text}
                     </ReactMarkdown>
                   </div>
-                )}
+                ) : loading && !msg.thinkingContent ? (
+                  <Spin indicator={<LoadingOutlined />} tip="小助手正在思考..." />
+                ) : null}
               </div>
               {msg.chat && (
                 <div style={{ marginTop: 8 }}>
@@ -249,16 +587,12 @@ export default function ChatPage() {
                       </Typography.Text>
                     </div>
                   )}
+
                 </div>
               )}
             </div>
           </div>
         ))}
-        {loading && (
-          <div style={{ textAlign: "center", padding: 8 }}>
-            <Spin tip="小助手正在思考..." />
-          </div>
-        )}
       </div>
       <div style={{ paddingTop: 12, borderTop: "1px solid #f0f0f0" }}>
         <Space.Compact style={{ width: "100%" }}>

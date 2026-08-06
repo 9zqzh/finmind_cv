@@ -140,3 +140,75 @@ def _save_turn(
     )
     if len(session.chat_history) > HISTORY_MAX_TURNS:
         del session.chat_history[:-HISTORY_MAX_TURNS]
+from typing import Any, AsyncGenerator
+
+from pydantic_ai.messages import (
+    FunctionToolCallEvent,
+    FunctionToolResultEvent,
+    PartDeltaEvent,
+    PartEndEvent,
+    TextPartDelta,
+    ThinkingPartDelta,
+)
+from pydantic_ai.run import AgentRunResultEvent
+
+
+async def run_chat_stream(
+    message: str,
+    deps: AgentDeps,
+    settings: Settings | None = None,
+) -> AsyncGenerator[dict[str, Any], None]:
+    """流式执行对话，逐步产出事件 dict。
+
+    产出的事件类型：
+    - thinking: {"type": "thinking", "content": str}
+    - tool_call: {"type": "tool_call", "tool_name": str}
+    - tool_result: {"type": "tool_result", "tool_name": str, "status": "ok"}
+    - text: {"type": "text", "content": str}
+    - done: {"type": "done", "chat": ChatResponse dict}
+    - error: {"type": "error", "message": str}
+    """
+    settings = settings or get_settings()
+    agent = get_agent(settings)
+    try:
+        async with agent.run_stream_events(message, deps=deps) as stream:
+            async for ev in stream:
+                if isinstance(ev, PartDeltaEvent) and isinstance(ev.delta, ThinkingPartDelta):
+                    yield {"type": "thinking", "content": ev.delta.content_delta}
+                elif isinstance(ev, FunctionToolCallEvent):
+                    yield {"type": "tool_call", "tool_name": ev.part.tool_name}
+                elif isinstance(ev, FunctionToolResultEvent):
+                    yield {"type": "tool_result", "tool_name": ev.part.tool_name, "status": "ok"}
+                elif isinstance(ev, PartDeltaEvent) and isinstance(ev.delta, TextPartDelta):
+                    yield {"type": "text", "content": ev.delta.content_delta}
+                elif isinstance(ev, AgentRunResultEvent):
+                    # 构建最终结构化响应
+                    tool_calls = [
+                        ToolCallInfo(
+                            tool=evt["tool"],
+                            result_type=evt.get("result_type", "text"),
+                        )
+                        for evt in deps.tool_events
+                    ]
+                    result_type = deps.last_result_type if deps.tool_events else "text"
+                    if result_type in _TEXT_ONLY_RESULT_TYPES:
+                        data = None
+                        sources: list[str] = []
+                        final_result_type = "text"
+                    else:
+                        data = deps.last_data if deps.tool_events else None
+                        sources = deps.sources
+                        final_result_type = result_type
+                    response = ChatResponse(
+                        answer=str(ev.result.output),
+                        intent=deps.last_result_type if deps.tool_events else "chat",
+                        tool_calls=tool_calls,
+                        result_type=final_result_type,
+                        data=data,
+                        sources=sources,
+                    )
+                    yield {"type": "done", "chat": response.model_dump()}
+    except AgentRunError as exc:
+        yield {"type": "error", "message": f"模型服务请求失败：{exc}"}
+    except TimeoutError as exc:
+        yield {"type": "error", "message": "模型响应超时，请稍后重试"}

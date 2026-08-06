@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from pydantic_ai import Agent
 from pydantic_ai.exceptions import AgentRunError
+from pydantic_ai.messages import ModelMessagesTypeAdapter
 
 from app.agent.model_client import build_model
 from app.agent.prompts import build_system_prompt
@@ -16,12 +17,15 @@ from app.config import Settings, get_settings
 from app.knowledge import KnowledgeService
 from app.schemas.chat import ChatResponse, ToolCallInfo
 from app.schemas.common import MODEL_ERROR, ApiError
-from app.services.session import JwxtSession
+from app.services.session import ChatTurn, JwxtSession
 
 _AGENT: Agent | None = None
 
 # 知识库/资讯类结果在对话界面只呈现文字总结，不渲染文档卡片、不展示源文件名
 _TEXT_ONLY_RESULT_TYPES = {"knowledge", "information"}
+
+# 对话记忆滑动窗口：最多保留最近 6 轮（12 条消息），超出丢弃最早轮次
+HISTORY_MAX_TURNS = 6
 
 
 def get_agent(settings: Settings | None = None) -> Agent:
@@ -51,17 +55,26 @@ def build_deps(
 async def run_chat(
     message: str,
     deps: AgentDeps,
+    session: JwxtSession | None = None,
     settings: Settings | None = None,
 ) -> ChatResponse:
-    """执行一轮对话并返回统一结构的 ChatResponse。"""
+    """执行一轮对话并返回统一结构的 ChatResponse。
+
+    若传入了登录会话，则启用多轮记忆：把会话中的历史轮次作为
+    message_history 传入模型，并把本轮结果存回会话（滑动窗口裁剪）。
+    """
     settings = settings or get_settings()
     agent = get_agent(settings)
+    history = _load_history(session)
     try:
-        result = await agent.run(message, deps=deps)
+        result = await agent.run(message, deps=deps, message_history=history or None)
     except AgentRunError as exc:
         raise ApiError(MODEL_ERROR, f"模型服务请求失败：{exc}", status_code=502) from exc
     except TimeoutError as exc:
         raise ApiError(MODEL_ERROR, "模型响应超时，请稍后重试", status_code=504) from exc
+
+    answer = str(result.output)
+    _save_turn(session, message, answer, result)
 
     tool_calls = [
         ToolCallInfo(
@@ -81,10 +94,49 @@ async def run_chat(
         data = deps.last_data if deps.tool_events else None
         sources = deps.sources
     return ChatResponse(
-        answer=str(result.output),
+        answer=answer,
         intent=deps.last_result_type if deps.tool_events else "chat",
         tool_calls=tool_calls,
         result_type=result_type,
         data=data,
         sources=sources,
+        conversation_id=session.token if session else None,
     )
+
+
+def _load_history(session: JwxtSession | None):
+    """从会话恢复历史模型消息；反序列化失败时静默降级为空历史。"""
+    if session is None or not session.chat_history:
+        return []
+    try:
+        return ModelMessagesTypeAdapter.validate_json(
+            session.chat_history[-1].model_messages_json
+        )
+    except Exception:
+        # 历史不可用（如 pydantic-ai 升级导致格式不兼容）不影响本轮对话
+        session.chat_history.clear()
+        return []
+
+
+def _save_turn(
+    session: JwxtSession | None,
+    message: str,
+    answer: str,
+    result,
+) -> None:
+    """把本轮对话存入会话记忆，并裁剪至最近 HISTORY_MAX_TURNS 轮。"""
+    if session is None:
+        return
+    try:
+        messages_json = ModelMessagesTypeAdapter.dump_json(result.all_messages())
+    except Exception:
+        return
+    session.chat_history.append(
+        ChatTurn(
+            user_message=message,
+            assistant_message=answer,
+            model_messages_json=messages_json.decode(),
+        )
+    )
+    if len(session.chat_history) > HISTORY_MAX_TURNS:
+        del session.chat_history[:-HISTORY_MAX_TURNS]

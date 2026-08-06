@@ -36,3 +36,7 @@ class ChatResponse(BaseModel):
     result_type: ResultType = Field(default="text")
     data: Any = Field(default=None, description="结构化结果，供前端渲染卡片")
     sources: list[str] = Field(default_factory=list, description="知识来源")
+    conversation_id: str | None = Field(
+        default=None,
+        description="会话标识（登录用户才有），多轮记忆随此会话生效；后期持久化落地时可扩展为独立对话 ID",
+    )

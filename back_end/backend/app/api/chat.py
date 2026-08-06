@@ -25,7 +25,7 @@ async def chat(
     knowledge: KnowledgeService = Depends(get_knowledge),
     information: KnowledgeService = Depends(get_information),
 ):
-    """发送自然语言问题，返回文本回答与可选结构化结果。"""
+    """发送自然语言问题，返回文本回答与可选结构化结果。登录用户自动启用多轮对话记忆。"""
     deps = build_deps(session, knowledge, information)
-    response = await run_chat(payload.message, deps)
+    response = await run_chat(payload.message, deps, session=session)
     return ok(response.model_dump())

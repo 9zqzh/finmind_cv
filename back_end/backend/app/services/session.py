@@ -13,6 +13,21 @@ from app.config import Settings
 
 
 @dataclass
+class ChatTurn:
+    """一轮完整对话（用户提问 + 助手回答 + 序列化后的模型消息）。
+
+    model_messages_json 保存 PydanticAI 的模型消息序列化结果，
+    下一轮可作为 message_history 直接恢复；后期迁移 SQLite/Redis
+    时只需替换存储层，数据结构保持不变。
+    """
+
+    user_message: str
+    assistant_message: str
+    model_messages_json: str
+    created_at: float = field(default_factory=time.time)
+
+
+@dataclass
 class JwxtSession:
     """一次用户会话：绑定一个教务客户端实例。"""
 
@@ -23,6 +38,8 @@ class JwxtSession:
     username: str | None = None
     # 缓存最近一次成绩列表，供"单科成绩明细"按 index 查询
     last_grade_report: GradeReport | None = None
+    # 对话记忆：仅当前会话内有效，随会话过期/登出自动清理
+    chat_history: list[ChatTurn] = field(default_factory=list)
 
     @property
     def is_logged_in(self) -> bool:

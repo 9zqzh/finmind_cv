@@ -125,3 +125,21 @@ export interface SearchData {
   results: SearchChunk[];
   sources: string[];
 }
+
+export interface ResourceFile {
+  name: string;
+  path: string;
+  ext: string;
+  size: number;
+}
+
+export interface ResourceDirectory {
+  name: string;
+  path: string;
+  files: ResourceFile[];
+}
+
+export interface ResourceTree {
+  directories: ResourceDirectory[];
+  files: ResourceFile[];
+}

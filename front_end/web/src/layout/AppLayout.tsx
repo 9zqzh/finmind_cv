@@ -3,11 +3,12 @@ import { Button, Layout, Menu, Space, Tag, Typography } from "antd";
 import {
   BookOutlined,
   CalendarOutlined,
+  DatabaseOutlined,
   HomeOutlined,
   LogoutOutlined,
+  NotificationOutlined,
   ReadOutlined,
   ScheduleOutlined,
-  SearchOutlined,
 } from "@ant-design/icons";
 import { useAuth } from "../context/AuthContext";
 import logo from "../assets/logo.jpg";
@@ -20,7 +21,8 @@ const menuItems = [
   { key: "/grades", icon: <ScheduleOutlined />, label: "成绩查询" },
   { key: "/training-plan", icon: <ReadOutlined />, label: "培养方案" },
   { key: "/classroom-schedule", icon: <BookOutlined />, label: "教室课表" },
-  { key: "/knowledge", icon: <SearchOutlined />, label: "知识与资讯" },
+  { key: "/knowledge", icon: <DatabaseOutlined />, label: "知识库" },
+  { key: "/information", icon: <NotificationOutlined />, label: "学院资讯" },
 ];
 
 export default function AppLayout() {

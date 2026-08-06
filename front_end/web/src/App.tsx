@@ -9,6 +9,7 @@ import GradesPage from "./pages/GradesPage";
 import TrainingPlanPage from "./pages/TrainingPlanPage";
 import ClassroomSchedulePage from "./pages/ClassroomSchedulePage";
 import KnowledgePage from "./pages/KnowledgePage";
+import InformationPage from "./pages/InformationPage";
 
 function ProtectedLayout() {
   const { loggedIn, loading } = useAuth();
@@ -38,6 +39,7 @@ export default function App() {
             <Route path="/training-plan" element={<TrainingPlanPage />} />
             <Route path="/classroom-schedule" element={<ClassroomSchedulePage />} />
             <Route path="/knowledge" element={<KnowledgePage />} />
+            <Route path="/information" element={<InformationPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

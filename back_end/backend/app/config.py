@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     # 数据目录（相对 backend 目录）
     knowledge_dir: str = Field(default="data/knowledge", alias="KNOWLEDGE_DIR")
     information_dir: str = Field(default="data/information", alias="INFORMATION_DIR")
+    # 原始资料文件目录（相对 backend 目录，默认为项目根下的 resources）
+    resources_dir: str = Field(default="../../resources", alias="RESOURCES_DIR")
 
     @property
     def model_configured(self) -> bool:

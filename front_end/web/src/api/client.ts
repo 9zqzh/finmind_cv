@@ -8,6 +8,7 @@ import type {
   GradeReport,
   LoginData,
   Schedule,
+  ResourceTree,
   SearchData,
   TrainingPlan,
 } from "./types";
@@ -124,4 +125,14 @@ export const api = {
     client
       .get<ApiEnvelope<SearchData>>("/api/information/search", { params: { q } })
       .then(unwrap),
+
+  // ---- 资料文件 ----
+
+  /** 资料文件树（按目录分组） */
+  resourceFiles: () =>
+    client.get<ApiEnvelope<ResourceTree>>("/api/knowledge/files").then(unwrap),
+
+  /** 资料文件下载/预览 URL */
+  resourceFileUrl: (path: string) =>
+    `/api/knowledge/files/download?path=${encodeURIComponent(path)}`,
 };

@@ -7,6 +7,7 @@ import pytest
 
 import gduf_web_api as api
 from gduf_web_api import GdufClient, NetworkError, UnsupportedSourceError
+from conftest import fixture_text
 
 
 def test_competition_list_parses_all_snapshot_items(client: GdufClient) -> None:
@@ -121,6 +122,35 @@ def test_club_list_parses_five_public_cards(client: GdufClient) -> None:
     ]
     assert result.items[0].direction == "量化投资"
     assert result.items[-1].url == "https://ai-data-competitions.cn/clubs/acm-team"
+
+
+def test_club_list_survives_streamed_cards_outside_overview(monkeypatch) -> None:
+    """回归：线上 Next.js 流式渲染会把部分社团卡片注入 #clubs-overview 之外，
+    解析器必须按整页扫描找全，且对重复 slug 去重。"""
+    html = fixture_text("aijspt_clubs.html")
+    parts = html.split("</article>")
+    # 把第 3 张卡片（ai-studio）移出概览容器，模拟 template 流式注入；
+    # 并在容器外追加一张重复的 quant-investment 卡片验证去重。
+    moved_out = parts[2] + "</article>"
+    duplicated = parts[0] + "</article>"
+    streamed = html.replace(moved_out, "", 1) + moved_out + duplicated
+
+    def fake_request_text(method, url, **kwargs):
+        return streamed, "https://ai-data-competitions.cn/clubs"
+
+    client = GdufClient(retries=0)
+    monkeypatch.setattr(client, "_request_text", fake_request_text)
+    result = client.get_clubs()
+
+    assert result.total_items == 5
+    # 按文档顺序返回：ai-studio 被移到页面末尾，因此排在最后
+    assert [club.slug for club in result.items] == [
+        "quant-investment",
+        "java-tribe",
+        "bricks-team",
+        "acm-team",
+        "ai-studio",
+    ]
 
 
 def test_aijspt_public_helpers_reuse_client(client: GdufClient) -> None:

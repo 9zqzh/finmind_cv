@@ -430,7 +430,11 @@ class AijsptAdapter:
         if container is None:
             raise ParseError("aijspt club overview not found")
         items: list[ClubSummary] = []
-        for card in container.select("article"):
+        seen_slugs: set[str] = set()
+        # 注意：线上页面是 Next.js 流式渲染，部分社团卡片被注入在 #clubs-overview
+        # 容器之外（template 兄弟节点），因此按整页扫描 article 并以
+        # “链接指向 /clubs/{slug}” 作为社团卡片特征，再按 slug 去重。
+        for card in soup.select("article"):
             heading = card.find("h3")
             anchor = card.find("a", href=True)
             paragraphs = card.find_all("p", recursive=False)
@@ -441,7 +445,12 @@ class AijsptAdapter:
             if not url:
                 continue
             path = urlparse(url).path.rstrip("/")
+            if not path.startswith("/clubs/"):
+                continue
             slug = path.rsplit("/", 1)[-1]
+            if slug in seen_slugs:
+                continue
+            seen_slugs.add(slug)
             items.append(
                 ClubSummary(
                     slug=slug,

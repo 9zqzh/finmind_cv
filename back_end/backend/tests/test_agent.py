@@ -20,7 +20,7 @@ def _build_test_agent() -> Agent:
 def test_all_tools_registered():
     agent = _build_test_agent()
     names = set(RESULT_TYPES.keys())
-    assert len(names) == 10
+    assert len(names) == 12
     # 通过 agent 的 toolset 检查已注册工具名
     registered: set[str] = set()
     for toolset in getattr(agent, "_user_toolsets", []):
@@ -30,7 +30,37 @@ def test_all_tools_registered():
         assert names <= registered
 
 
-def test_run_with_test_model(tmp_path):
+def test_run_with_test_model(tmp_path, monkeypatch):
+    # TestModel 会随机选择工具调用，把外部适配层替换为桩避免真实网络请求
+    from app.adapters import academic as academic_adapter
+    from app.adapters import gduf_web as gduf_web_adapter
+    from app.adapters import jwxt as jwxt_adapter
+
+    async def _fake_ok(*args, **kwargs):
+        return {"total": 0, "results": [], "message": "测试桩"}
+
+    for name in dir(gduf_web_adapter):
+        if name.startswith(("search_", "get_")):
+            monkeypatch.setattr(gduf_web_adapter, name, _fake_ok)
+    for name in dir(academic_adapter):
+        if name.startswith(("search_", "get_")):
+            monkeypatch.setattr(academic_adapter, name, _fake_ok)
+
+    async def _fake_auth_required(*args, **kwargs):
+        from app.schemas.common import AUTH_REQUIRED, ApiError
+
+        raise ApiError(AUTH_REQUIRED, "请先登录教务系统", status_code=401)
+
+    for name in (
+        "get_schedule",
+        "get_grades",
+        "get_grade_detail",
+        "get_training_plan",
+        "get_classroom_schedule",
+        "get_empty_classrooms",
+    ):
+        monkeypatch.setattr(jwxt_adapter, name, _fake_auth_required)
+
     (tmp_path / "示例.md").write_text("# 示例\n\n这是测试资料。\n", encoding="utf-8")
     agent = _build_test_agent()
     deps = build_deps(

@@ -82,6 +82,9 @@ async def run_gduf(func: Callable[[], T]) -> T:
         return await asyncio.to_thread(func)
     except GdufError as exc:
         raise translate_gduf_error(exc) from exc
+    except ValueError as exc:
+        # 竞赛平台对无效的比赛 ID/URL 抛 ValueError，归一为参数错误
+        raise ApiError(INVALID_PARAM, f"参数不合法：{exc}", status_code=400) from exc
 
 
 def shape_search_result(keyword: str, page_result) -> dict[str, Any]:

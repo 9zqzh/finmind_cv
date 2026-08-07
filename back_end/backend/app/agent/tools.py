@@ -33,6 +33,8 @@ RESULT_TYPES: dict[str, str] = {
     "search_information": "information",
     "search_website": "website",
     "search_academic": "academic",
+    "query_competitions": "competition",
+    "query_competition_detail": "competition_detail",
 }
 
 
@@ -282,6 +284,71 @@ def register_tools(agent: Agent) -> None:
         except ApiError as exc:
             return _record_failure(ctx, "search_academic", exc.message)
         _record_success(ctx, "search_academic", data)
+        return data
+
+    @agent.tool
+    async def query_competitions(
+        ctx: RunContext[AgentDeps],
+        keyword: Annotated[
+            str | None,
+            Field(
+                default=None,
+                description="按比赛标题与简介模糊匹配的关键词（如“软件设计”“数学建模”），不限关键词时不传",
+            ),
+        ] = None,
+        year: Annotated[
+            int | None, Field(description="比赛年份（如 2026），不限年份时不传")
+        ] = None,
+        status: Annotated[
+            str | None,
+            Field(
+                description=(
+                    "比赛状态筛选：registration_open（报名中）、upcoming（即将开始）、"
+                    "in_progress（进行中）、finished（已结束）、previous_recording（往期补录中）；"
+                    "不限状态时不传"
+                )
+            ),
+        ] = None,
+        category: Annotated[
+            str | None, Field(description="按平台分类精确匹配（如“软件设计类”“计算机类”），不限分类时不传")
+        ] = None,
+        department: Annotated[
+            str | None, Field(description="按归属学院精确匹配（如“大数据与人工智能学院”），不限学院时不传")
+        ] = None,
+    ) -> dict[str, Any]:
+        """查询学院竞赛平台的比赛列表（实时来自竞赛管理与问答平台），返回比赛名称、分类、年份、状态、报名起止时间、承办学院与链接。调用时机：用户询问竞赛/比赛相关信息（如“最近有什么竞赛可以参加”“有没有软件设计类的比赛”“现在哪些比赛在报名”）；用户说“现在能报名的比赛”时应传 status=registration_open。调用后用自己的话汇总推荐：逐场介绍比赛名称、报名状态与截止时间，并附上比赛页面链接，不要输出原始 JSON。本工具结果仅供你组织回复，前端不展示结构化数据。"""
+        try:
+            data = await gduf_web_adapter.get_competitions(
+                year=year,
+                status=status,
+                category=category,
+                department=department,
+                keyword=keyword,
+            )
+        except ApiError as exc:
+            return _record_failure(ctx, "query_competitions", exc.message)
+        _record_success(ctx, "query_competitions", data)
+        return data
+
+    @agent.tool
+    async def query_competition_detail(
+        ctx: RunContext[AgentDeps],
+        competition_id: Annotated[
+            str,
+            Field(
+                description=(
+                    "要查询详情的比赛标识：优先传 query_competitions 返回结果中的 id 字段，"
+                    "也可传比赛页面 URL"
+                )
+            ),
+        ],
+    ) -> dict[str, Any]:
+        """查询某一场比赛的详细信息（时间线、地点、赛道、报名要求、附件资料等，实时来自竞赛平台）。调用时机：用户在看过比赛列表后追问某一场具体比赛的详情（如“这个比赛怎么报名”“软件设计大赛的时间安排”）。必须先通过 query_competitions 拿到比赛列表后再用其中的 id 调用，不要凭空猜测 id。调用后用自己的话介绍详情要点并附链接，不要输出原始 JSON。本工具结果仅供你组织回复，前端不展示结构化数据。"""
+        try:
+            data = await gduf_web_adapter.get_competition_detail(competition_id)
+        except ApiError as exc:
+            return _record_failure(ctx, "query_competition_detail", exc.message)
+        _record_success(ctx, "query_competition_detail", data)
         return data
 
 

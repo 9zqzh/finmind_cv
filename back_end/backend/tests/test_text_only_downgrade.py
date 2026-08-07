@@ -52,6 +52,23 @@ async def test_knowledge_and_information_still_downgraded(test_agent):
 
 
 @pytest.mark.asyncio
+async def test_competition_results_downgraded(test_agent):
+    """竞赛列表与详情的结构化结果必须降级为纯文本，data 为 None。"""
+    assert {"competition", "competition_detail"} <= _TEXT_ONLY_RESULT_TYPES
+    raw = {"total": 1, "results": [{"title": "软件设计大赛", "status": "registration_open"}]}
+    deps = _deps_with_tool_result("query_competitions", "competition", raw)
+    response = await run_chat("最近有什么竞赛可以参加？", deps)
+    assert response.result_type == "text"
+    assert response.data is None
+
+    detail = {"competition": {"title": "软件设计大赛"}, "timeline": []}
+    deps = _deps_with_tool_result("query_competition_detail", "competition_detail", detail)
+    response = await run_chat("这个比赛怎么报名？", deps)
+    assert response.result_type == "text"
+    assert response.data is None
+
+
+@pytest.mark.asyncio
 async def test_structured_cards_keep_data(test_agent):
     """课表/成绩等卡片类结果不受影响，data 原样返回。"""
     raw = {"term": "2026-2027-1", "items": []}

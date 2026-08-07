@@ -272,3 +272,16 @@ async def test_get_competition_detail_translates_error(monkeypatch) -> None:
     with pytest.raises(ApiError) as excinfo:
         await gduf_adapter.get_competition_detail("uuid-1")
     assert excinfo.value.code == UPSTREAM_ERROR
+
+
+@pytest.mark.asyncio
+async def test_run_gduf_translates_value_error(monkeypatch) -> None:
+    """竞赛平台对无效 ID/URL 抛 ValueError，应归一为 INVALID_PARAM。"""
+    from app.schemas.common import ApiError
+
+    def raise_value_error():
+        raise ValueError("competition detail URL must identify one competition")
+
+    with pytest.raises(ApiError) as excinfo:
+        await gduf_adapter.run_gduf(raise_value_error)
+    assert excinfo.value.code == INVALID_PARAM

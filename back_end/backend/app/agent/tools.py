@@ -35,6 +35,8 @@ RESULT_TYPES: dict[str, str] = {
     "search_academic": "academic",
     "query_competitions": "competition",
     "query_competition_detail": "competition_detail",
+    "query_competition_notices": "competition_notice",
+    "query_competition_clubs": "competition_club",
 }
 
 
@@ -349,6 +351,33 @@ def register_tools(agent: Agent) -> None:
         except ApiError as exc:
             return _record_failure(ctx, "query_competition_detail", exc.message)
         _record_success(ctx, "query_competition_detail", data)
+        return data
+
+    @agent.tool
+    async def query_competition_notices(
+        ctx: RunContext[AgentDeps],
+        limit: int = Field(default=20, description="获取的通知条数（1-50），默认 20"),
+    ) -> dict[str, Any]:
+        """查询学院竞赛平台的最新通知公告（实时来自竞赛管理与问答平台），返回通知标题、发布时间与链接。调用时机：用户询问竞赛平台的公告动态（如“竞赛平台有什么新通知”“比赛平台最近发布了什么公告”）。调用后按时间由近到远用自然语言归纳通知要点并附链接，不要输出原始 JSON。本工具结果仅供你组织回复，前端不展示结构化数据。"""
+        try:
+            data = await gduf_web_adapter.get_competition_notices(
+                limit=min(max(limit, 1), 50)
+            )
+        except ApiError as exc:
+            return _record_failure(ctx, "query_competition_notices", exc.message)
+        _record_success(ctx, "query_competition_notices", data)
+        return data
+
+    @agent.tool
+    async def query_competition_clubs(
+        ctx: RunContext[AgentDeps],
+    ) -> dict[str, Any]:
+        """查询学院竞赛平台的学生竞赛社团列表（实时来自竞赛管理与问答平台），返回社团名称、简介与链接。调用时机：用户询问竞赛社团/竞赛团队信息（如“学院有哪些竞赛社团”“想参加竞赛该加入什么社团”）。调用后逐个用自然语言介绍社团定位并附链接，不要输出原始 JSON。本工具结果仅供你组织回复，前端不展示结构化数据。"""
+        try:
+            data = await gduf_web_adapter.get_competition_clubs()
+        except ApiError as exc:
+            return _record_failure(ctx, "query_competition_clubs", exc.message)
+        _record_success(ctx, "query_competition_clubs", data)
         return data
 
 

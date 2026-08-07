@@ -53,8 +53,13 @@ async def test_knowledge_and_information_still_downgraded(test_agent):
 
 @pytest.mark.asyncio
 async def test_competition_results_downgraded(test_agent):
-    """竞赛列表与详情的结构化结果必须降级为纯文本，data 为 None。"""
-    assert {"competition", "competition_detail"} <= _TEXT_ONLY_RESULT_TYPES
+    """竞赛列表、详情、通知与社团的结构化结果必须降级为纯文本，data 为 None。"""
+    assert {
+        "competition",
+        "competition_detail",
+        "competition_notice",
+        "competition_club",
+    } <= _TEXT_ONLY_RESULT_TYPES
     raw = {"total": 1, "results": [{"title": "软件设计大赛", "status": "registration_open"}]}
     deps = _deps_with_tool_result("query_competitions", "competition", raw)
     response = await run_chat("最近有什么竞赛可以参加？", deps)
@@ -64,6 +69,18 @@ async def test_competition_results_downgraded(test_agent):
     detail = {"competition": {"title": "软件设计大赛"}, "timeline": []}
     deps = _deps_with_tool_result("query_competition_detail", "competition_detail", detail)
     response = await run_chat("这个比赛怎么报名？", deps)
+    assert response.result_type == "text"
+    assert response.data is None
+
+    notices = {"total": 1, "results": [{"title": "关于举办大赛的通知"}]}
+    deps = _deps_with_tool_result("query_competition_notices", "competition_notice", notices)
+    response = await run_chat("竞赛平台有什么新通知？", deps)
+    assert response.result_type == "text"
+    assert response.data is None
+
+    clubs = {"total": 1, "results": [{"name": "算法竞赛社团"}]}
+    deps = _deps_with_tool_result("query_competition_clubs", "competition_club", clubs)
+    response = await run_chat("学院有哪些竞赛社团？", deps)
     assert response.result_type == "text"
     assert response.data is None
 

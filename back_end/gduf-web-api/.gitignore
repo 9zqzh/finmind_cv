@@ -1,0 +1,56 @@
+# ============ 环境与密钥 ============
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+env/
+
+# ============ Python ============
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ============ Node / 前端 ============
+node_modules/
+dist/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ============ 日志与临时文件 ============
+*.log
+logs/
+tmp/
+temp/
+
+
+# ============ 编辑器与 IDE ============
+.idea/
+.vscode/
+*.swp
+*.sublime-workspace
+.qoder/
+
+# ============ 操作系统 ============
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ============ Jupyter ============
+.ipynb_checkpoints/
+
+# ============ snapshot ============
+snapshot-2026-08-06T10-03-02-505Z
+snapshot-2026-08-06T11-34-54-017Z
+snapshot-2026-08-06T11-39-39-361Z

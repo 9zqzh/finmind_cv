@@ -14,6 +14,7 @@ from typing import Annotated, Any
 from pydantic import Field
 from pydantic_ai import Agent, RunContext
 
+from app.adapters import gduf_web as gduf_web_adapter
 from app.adapters import jwxt as jwxt_adapter
 from app.knowledge import KnowledgeService
 from app.schemas.common import ApiError
@@ -29,6 +30,7 @@ RESULT_TYPES: dict[str, str] = {
     "query_training_plan": "training_plan",
     "search_knowledge": "knowledge",
     "search_information": "information",
+    "search_website": "website",
 }
 
 
@@ -235,6 +237,22 @@ def register_tools(agent: Agent) -> None:
             ],
         }
         _record_success(ctx, "search_information", data)
+        return data
+
+    @agent.tool
+    async def search_website(
+        ctx: RunContext[AgentDeps],
+        keyword: Annotated[
+            str, Field(description="要在学院官网检索的关键词，如新闻、通知、老师姓名、专业等")
+        ],
+        page: int = Field(default=1, description="结果页码，默认第 1 页"),
+    ) -> dict[str, Any]:
+        """关键词搜索学院官网的公开内容（学院新闻、通知公告、学生活动、师资队伍、专业介绍等，实时来自官网）。调用时机：用户询问学院官网上的公开信息（如“学院最近有什么通知”“某位老师是谁”“学院有哪些专业”），且课表/成绩/培养方案/知识库等其他工具不适用时；检索后用自己的话总结提炼回答，不要照搬原文。注意：本工具结果仅供你组织回复，前端不会展示原始数据，请用自然语言汇总，不要输出 JSON。"""
+        try:
+            data = await gduf_web_adapter.search_website(keyword, page=page)
+        except ApiError as exc:
+            return _record_failure(ctx, "search_website", exc.message)
+        _record_success(ctx, "search_website", data)
         return data
 
 

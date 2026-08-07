@@ -24,7 +24,8 @@ _AGENT: Agent | None = None
 # 以下结果在对话界面只呈现文字总结，不渲染结构化卡片、不把原始数据发给前端：
 # - knowledge/information：不展示知识库 markdown 原文卡片与源文件清单
 # - empty_classrooms：空闲教室名单已由模型用自然语言汇总，不渲染原始 JSON
-_TEXT_ONLY_RESULT_TYPES = {"knowledge", "information", "empty_classrooms"}
+# - website：官网搜索结果由模型总结提炼，不展示结构化条目
+_TEXT_ONLY_RESULT_TYPES = {"knowledge", "information", "empty_classrooms", "website"}
 
 # 对话记忆滑动窗口：最多保留最近 6 轮（12 条消息），超出丢弃最早轮次
 HISTORY_MAX_TURNS = 6

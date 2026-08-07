@@ -13,6 +13,8 @@ dependencies = [
     "pydantic-settings>=2.0",
     "fastapi>=0.111",
     "uvicorn>=0.30",
+    "gduf-jwxt-api==0.2.0",
+    "gduf-web-api==0.2.1",
 ]
 
 [project.optional-dependencies]
@@ -20,10 +22,6 @@ test = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
 ]
-
-# 本地教务接口包（可编辑安装）：
-#   pip install -e ../gdufjwxtapi
-# 不写进 dependencies 是为了保证 pyproject 在其他机器上仍可解析。
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]

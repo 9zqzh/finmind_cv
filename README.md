@@ -35,15 +35,15 @@ flowchart LR
   Agent --> LLM["DeepSeek（OpenAI 兼容接口）"]
 ```
 
-项目由四个主要部分组成：
+项目由三个主工程和两个 PyPI 客户端依赖组成：
 
 | 目录 | 职责 | 核心技术 |
 | --- | --- | --- |
 | `front_end/web` | 浏览器界面、登录状态与结构化结果展示 | React 18、TypeScript、Vite、Ant Design、Axios |
 | `back_end/backend` | API、会话管理、Agent 编排、知识检索 | Python 3.10+、FastAPI、PydanticAI、Pydantic Settings |
-| `back_end/gduf-jwxt-api` | 教务系统登录与旧版 JSP 页面解析 | httpx、Beautiful Soup 4 |
-| `back_end/gduf-web-api` | 学院官网公开内容抓取与搜索、竞赛平台公开信息检索 | httpx、Beautiful Soup 4 |
 | `back_end/gduf-academic-api` | 学术资源平台聚合检索（arXiv、Semantic Scholar 等） | httpx |
+
+后端通过 PyPI 依赖 [`gduf-jwxt-api`](https://pypi.org/project/gduf-jwxt-api/) 和 [`gduf-web-api`](https://pypi.org/project/gduf-web-api/) 分别访问教务系统、学院官网与竞赛平台；源码由各自的上游仓库独立维护。
 
 ## 快速开始
 
@@ -64,8 +64,6 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install -e ".[test]"
-python -m pip install -e ..\gduf-jwxt-api
-python -m pip install -e ..\gduf-web-api
 python -m pip install -e ..\gduf-academic-api
 Copy-Item .env.example .env
 ```
@@ -169,20 +167,12 @@ X-Session-Token: <session_token>
 
 ## 测试与构建
 
-后端测试覆盖 API 基础行为、知识检索、Agent 工具注册、教务客户端解析、官网适配层、空闲教室过滤、纯文本降级、对话记忆等。运行：
+后端测试覆盖 API 基础行为、知识检索、Agent 工具注册、教务与官网适配层、空闲教室过滤、纯文本降级、对话记忆等。运行：
 
 ```powershell
 # 后端服务测试（50 个用例）
 cd back_end\backend
 .\.venv\Scripts\python -m pytest
-
-# 教务客户端测试
-cd ..\gduf-jwxt-api
-..\backend\.venv\Scripts\python -m pytest
-
-# 官网客户端测试
-cd ..\gduf-web-api
-..\backend\.venv\Scripts\python -m pytest -o addopts=""
 
 # 学术资源客户端测试
 cd ..\gduf-academic-api
@@ -193,7 +183,7 @@ cd ..\..\front_end\web
 npm run build
 ```
 
-教务客户端的大多数测试使用 `httpx.MockTransport` 模拟上游，不需要真实学号、密码或网络访问。官网客户端测试使用预录制的 HTML/JSON fixture 文件（含学院官网与竞赛平台页面）。学术资源客户端测试使用 MockTransport 模拟 arXiv XML 与 Semantic Scholar JSON 响应。`tests/test_real_responses.py` 另外依赖本地响应样本文件，未补充样本时应跳过此项测试。
+主后端通过桩对象测试教务与官网客户端适配层，不需要真实学号、密码或上游网络访问。两个 PyPI 客户端自身的解析测试和 fixture 由上游仓库维护。学术资源客户端测试使用 MockTransport 模拟 arXiv XML 与 Semantic Scholar JSON 响应。
 
 ## 资料维护与当前限制
 
@@ -206,8 +196,8 @@ npm run build
 ## 进一步阅读
 
 - [后端说明](back_end/backend/README.md)
-- [教务客户端 API 说明](back_end/gduf-jwxt-api/README.md)
-- [官网客户端说明](back_end/gduf-web-api/README.md)
+- [教务客户端 API 说明](https://github.com/LiangJZ1/gduf-jwxt-api)
+- [官网客户端说明](https://github.com/LiangJZ1/gduf-web-api)
 - [学术资源客户端说明](back_end/gduf-academic-api/README.md)
 - [业务功能说明](docs/业务功能说明.md)
 - [技术栈说明](docs/技术栈说明.md)

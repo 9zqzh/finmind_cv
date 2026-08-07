@@ -154,8 +154,8 @@ if __name__ == "__main__":
 
 ---
 
-## 九、本项目当前状态（2026-08-05）
+## 九、本项目当前状态（2026-08-07）
 
-- `backend/.venv` 虚拟环境已创建，`pydantic-ai 2.24`、`fastapi`、`uvicorn`、`pytest`、`pydantic-settings`、`openai` 等依赖已全部安装就位，`jwxtapi` 教务包已以可编辑模式装入。
-- 后端骨架已搭建完成并实测通过，运行 `.venv\Scripts\python -m pytest` 应有 16 个测试全部通过。
+- `gduf-jwxt-api==0.2.0` 与 `gduf-web-api==0.2.1` 已声明为后端 PyPI 依赖，安装后端时自动装入；`gduf-academic-api` 仍以本地可编辑模式安装。
+- 后端骨架已搭建完成并实测通过，运行 `.venv\Scripts\python -m pytest` 应有 50 个测试全部通过。
 - 后续开发请阅读《docs/后端后续开发操作指南.md》。

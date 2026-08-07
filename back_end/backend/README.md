@@ -1,6 +1,6 @@
 # 学院教学小助手 · Backend
 
-基于 **PydanticAI 2.x + FastAPI + DeepSeek（OpenAI 兼容）+ gdufjwxtapi** 的后端骨架，已可运行。
+基于 **PydanticAI 2.x + FastAPI + DeepSeek（OpenAI 兼容）+ gduf-jwxt-api** 的后端骨架，已可运行。
 
 ## 目录结构
 
@@ -14,7 +14,7 @@ backend/
     services/
       session.py            # 内存会话管理（token -> JwxtClient，TTL 过期）
     adapters/
-      jwxt.py               # gdufjwxtapi 适配层（异常映射、async 包装）
+      jwxt.py               # gduf-jwxt-api 适配层（异常映射、async 包装）
     agent/
       model_client.py       # DeepSeek OpenAI 兼容模型客户端
       prompts.py            # 系统提示词（含当前日期）
@@ -34,8 +34,10 @@ backend/
 cd back_end\backend
 python -m venv .venv                       # 已创建可跳过
 .venv\Scripts\python -m pip install -e ".[test]"
-.venv\Scripts\python -m pip install -e ..\gdufjwxtapi   # 教务接口包
+.venv\Scripts\python -m pip install -e ..\gduf-academic-api   # 本地学术资源接口包
 ```
+
+`gduf-jwxt-api` 与 `gduf-web-api` 已声明为后端的 PyPI 运行依赖，会随第一条安装命令自动安装。
 
 ## 配置
 

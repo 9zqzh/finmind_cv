@@ -36,6 +36,27 @@ def transport(request_log: list[httpx.Request]) -> httpx.MockTransport:
     def handler(request: httpx.Request) -> httpx.Response:
         request_log.append(request)
         path = request.url.path
+        if request.url.host == "ai-data-competitions.cn":
+            if path == "/api/competitions":
+                name = "aijspt_competitions.json"
+                content_type = "application/json"
+            elif path == "/api/notices/published":
+                name = "aijspt_notices.json"
+                content_type = "application/json"
+            elif path == "/clubs":
+                name = "aijspt_clubs.html"
+                content_type = "text/html; charset=utf-8"
+            elif path == "/competitions/3c3f766f-684f-46cb-b265-a686a9f3738b":
+                name = "aijspt_detail.html"
+                content_type = "text/html; charset=utf-8"
+            else:
+                return httpx.Response(404, request=request)
+            return httpx.Response(
+                200,
+                text=fixture_text(name),
+                headers={"content-type": content_type},
+                request=request,
+            )
         if request.method == "POST" and path == "/search.jsp":
             return httpx.Response(200, text=fixture_text("search.html"), request=request)
         if path == "/":

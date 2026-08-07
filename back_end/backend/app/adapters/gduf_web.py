@@ -5,8 +5,8 @@
 2. 把 gduf_web_api 的 dataclass 模型转换为可 JSON 序列化的 dict。
 3. 同步 httpx 调用统一包装为 async（asyncio.to_thread），避免阻塞事件循环。
 
-与教务系统不同，学院官网内容为公开页面、无需登录，因此不复用 JwxtSession，
-而是在模块内维护一个共享的 GdufClient 以复用连接。
+与教务系统不同，学院官网与竞赛平台内容均为公开页面、无需登录，因此不复用
+JwxtSession，而是在模块内维护一个共享的 GdufClient 以复用连接。
 """
 
 from __future__ import annotations
@@ -20,6 +20,10 @@ from gduf_web_api import (
     InvalidPageError,
     NetworkError,
     ParseError,
+    get_aijspt_bslb,
+    get_aijspt_bsxq,
+    get_aijspt_stlb,
+    get_aijspt_tzgg,
     search_ai,
 )
 
@@ -34,6 +38,12 @@ T = TypeVar("T")
 
 # 搜索结果单次返回给模型的最大条目数，控制上下文窗口占用
 SEARCH_MAX_ITEMS = 10
+
+# 竞赛列表/通知单次返回给模型的最大条目数
+COMPETITION_MAX_ITEMS = 10
+
+# 比赛摘要与通知正文的截断长度，避免长文本挤占上下文
+SUMMARY_LIMIT = 200
 
 # 官网公开内容无需鉴权，进程内复用同一客户端以减少建连开销
 _client: GdufClient | None = None
@@ -108,3 +118,144 @@ async def search_website(keyword: str, page: int = 1) -> dict[str, Any]:
     client = get_client()
     page_result = await run_gduf(lambda: search_ai(keyword, page, client=client))
     return shape_search_result(keyword, page_result)
+
+
+# ---- 竞赛平台（aijspt）业务方法 ----
+
+
+def shape_competition_summary(item) -> dict[str, Any]:
+    """把 CompetitionSummary 精简为供模型总结的紧凑结构。"""
+    summary = (item.summary or "").strip()
+    return {
+        "id": item.id,
+        "title": item.title,
+        "url": item.url,
+        "category": item.category,
+        "year": item.competition_year,
+        "recognition": item.recognition,
+        "status": item.status,
+        "department": item.department,
+        "max_team_size": item.max_team_size,
+        "registration_start_at": (
+            item.registration_start_at.isoformat() if item.registration_start_at else None
+        ),
+        "registration_end_at": (
+            item.registration_end_at.isoformat() if item.registration_end_at else None
+        ),
+        "official_url": item.official_url,
+        "summary": summary[:SUMMARY_LIMIT],
+    }
+
+
+def shape_competition_list(list_result) -> dict[str, Any]:
+    """把 ListResult[CompetitionSummary] 精简为供模型总结的紧凑结构。"""
+    items = [shape_competition_summary(item) for item in list_result.items[:COMPETITION_MAX_ITEMS]]
+    return {
+        "total": list_result.total_items,
+        "results": items,
+        "message": (
+            "竞赛平台没有找到符合条件的比赛，建议放宽筛选条件或稍后再试。"
+            if not items
+            else ""
+        ),
+    }
+
+
+def shape_competition_detail(detail) -> dict[str, Any]:
+    """把 CompetitionDetail 精简为供模型总结的紧凑结构。"""
+    competition = detail.competition
+    description = (detail.description_text or "").strip()
+    return {
+        "competition": shape_competition_summary(competition),
+        "location": detail.location,
+        "highlights": list(detail.highlights),
+        "sub_tracks": list(detail.sub_tracks),
+        "timeline": [
+            {"date": phase.date, "label": phase.label, "description": phase.description}
+            for phase in detail.timeline
+        ],
+        "attachments": [{"title": link.title, "url": link.url} for link in detail.attachments],
+        "description": description[: SUMMARY_LIMIT * 3],
+    }
+
+
+def shape_notice_list(list_result) -> dict[str, Any]:
+    """把 ListResult[Notice] 精简为供模型总结的紧凑结构。"""
+    items = [
+        {
+            "title": item.title,
+            "content": (item.content or "").strip()[:SUMMARY_LIMIT],
+            "priority": item.priority,
+            "published_at": item.published_at.isoformat() if item.published_at else None,
+            "competition_title": item.competition_title,
+        }
+        for item in list_result.items[:COMPETITION_MAX_ITEMS]
+    ]
+    return {
+        "total": list_result.total_items,
+        "results": items,
+        "message": "竞赛平台当前没有公开通知。" if not items else "",
+    }
+
+
+def shape_club_list(list_result) -> dict[str, Any]:
+    """把 ListResult[ClubSummary] 精简为供模型总结的紧凑结构。"""
+    items = [
+        {
+            "name": item.name,
+            "direction": item.direction,
+            "slogan": item.slogan,
+            "description": (item.description or "").strip()[:SUMMARY_LIMIT],
+            "url": item.url,
+        }
+        for item in list_result.items[:COMPETITION_MAX_ITEMS]
+    ]
+    return {
+        "total": list_result.total_items,
+        "results": items,
+        "message": "竞赛平台当前没有公开的社团信息。" if not items else "",
+    }
+
+
+async def get_competitions(
+    *,
+    year: int | None = None,
+    status: str | None = None,
+    category: str | None = None,
+    department: str | None = None,
+    keyword: str | None = None,
+) -> dict[str, Any]:
+    """查询竞赛平台的比赛列表（支持年份/状态/分类/学院/关键词筛选）。"""
+    client = get_client()
+    list_result = await run_gduf(
+        lambda: get_aijspt_bslb(
+            year=year,
+            status=status,
+            category=category,
+            department=department,
+            keyword=keyword,
+            client=client,
+        )
+    )
+    return shape_competition_list(list_result)
+
+
+async def get_competition_detail(competition_or_id) -> dict[str, Any]:
+    """查询单场比赛的详情（接受比赛对象、UUID、相对路径或同域 URL）。"""
+    client = get_client()
+    detail = await run_gduf(lambda: get_aijspt_bsxq(competition_or_id, client=client))
+    return shape_competition_detail(detail)
+
+
+async def get_competition_notices(limit: int = 20) -> dict[str, Any]:
+    """查询竞赛平台的公开通知公告。"""
+    client = get_client()
+    list_result = await run_gduf(lambda: get_aijspt_tzgg(limit, client=client))
+    return shape_notice_list(list_result)
+
+
+async def get_competition_clubs() -> dict[str, Any]:
+    """查询竞赛平台公开的学生竞赛社团概览。"""
+    client = get_client()
+    list_result = await run_gduf(lambda: get_aijspt_stlb(client=client))
+    return shape_club_list(list_result)

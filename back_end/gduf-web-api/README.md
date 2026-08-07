@@ -1,6 +1,6 @@
 # gduf-web-api
 
-广东金融学院公开网站的类型化 Python 客户端。首个来源是大数据与人工智能学院（`ai`）。
+广东金融学院公开网站的类型化 Python 客户端。当前支持大数据与人工智能学院官网（`ai`）和学院竞赛管理与问答平台（`aijspt`）。
 
 > 本项目是非官方客户端，与广东金融学院及其下属学院没有隶属关系。数据来自公开网页；网站结构变化可能导致解析失效。
 
@@ -12,12 +12,12 @@ pip install gduf-web-api
 
 需要 Python 3.10 或更高版本。
 
-仓库根目录的 [`example.py`](example.py) 包含新闻、详情、教师、学院简介、专业介绍和搜索的完整调用示例。
+仓库根目录的 [`示例.py`](示例.py) 包含学院官网和竞赛平台的完整调用示例。
 
 ## 快速开始
 
 ```python
-from gduf_web_api import get_ai_detail, get_ai_xyxw, search_ai
+from gduf_web_api import get_ai_detail, get_ai_xyxw, get_aijspt_bslb, search_ai
 
 news = get_ai_xyxw(page=1)
 print(news.total_items, news.total_pages)
@@ -31,6 +31,10 @@ print(detail.content_text)
 results = search_ai("人工智能")
 for item in results.items:
     print(item.title)
+
+competitions = get_aijspt_bslb(year=2026, status="registration_open")
+for competition in competitions.items:
+    print(competition.title, competition.registration_end_at)
 ```
 
 返回值是不可变 dataclass；`to_dict()` 会把日期和嵌套模型转换为 JSON 兼容值。
@@ -74,6 +78,45 @@ print(json.dumps(major.to_dict(), ensure_ascii=False))
 - `search_ai(keyword, page=1)`：AI 学院站内搜索。
 - `get_ai_detail(item_or_url)`：接受 `ArticleSummary`、`PersonSummary`、相对 URL 或同域绝对 URL。
 
+竞赛平台（`aijspt`）：
+
+- `get_aijspt_bslb(year=None, status=None, category=None, department=None, keyword=None)`：比赛列表；筛选条件同时生效，结果保持平台排序。
+- `get_aijspt_bsxq(competition_or_id)`：比赛详情；接受 `CompetitionSummary`、比赛 UUID、相对路径或同域绝对 URL。
+- `get_aijspt_tzgg(limit=20)`：公开通知公告。
+- `get_aijspt_stlb()`：五大竞赛社团概览。
+
+### 可输入参数
+
+| 适用接口 | 参数 | 类型 | 默认值 | 可输入值与说明 |
+| --- | --- | --- | --- | --- |
+| `get_ai_xyxw`、`get_ai_xshuhd`、`get_ai_xshenghd`、`get_ai_tzgg`、`get_ai_xyld`、`get_ai_zrjs`、`get_ai_jfry` | `page` | `int` | `1` | 从 `1` 开始的正整数；最大页数由网站决定，超出范围抛出 `InvalidPageError`。 |
+| `search_ai` | `keyword` | `str` | 必填 | 非空搜索词；前后空白会被移除。 |
+| `search_ai` | `page` | `int` | `1` | 从 `1` 开始的搜索结果页码。 |
+| `get_ai_detail` | `item_or_url` | `ArticleSummary | PersonSummary | str` | 必填 | 可传列表结果对象、AI 学院站内相对 URL，或 `https://ai.gduf.edu.cn/` 同域绝对 URL。 |
+| `get_aijspt_bslb` | `year` | `int | None` | `None` | 比赛年份正整数，例如 `2026`；`None` 表示不限年份。 |
+| `get_aijspt_bslb` | `status` | `str | None` | `None` | `registration_open`、`previous_recording`、`upcoming`、`in_progress` 或 `finished`；`None` 表示不限状态。 |
+| `get_aijspt_bslb` | `category` | `str | None` | `None` | 按平台分类原文精确匹配，例如 `"软件设计类"`、`"计算机类"`；`None` 表示不限分类。 |
+| `get_aijspt_bslb` | `department` | `str | None` | `None` | 按归属学院原文精确匹配，例如 `"大数据与人工智能学院"`；`None` 表示不限学院。 |
+| `get_aijspt_bslb` | `keyword` | `str | None` | `None` | 在比赛标题和摘要中进行不区分大小写的包含匹配；不能传空字符串。 |
+| `get_aijspt_bsxq` | `competition_or_id` | `CompetitionSummary | str` | 必填 | 可传比赛列表对象、UUID、`/competitions/{UUID}` 相对路径，或 `https://ai-data-competitions.cn/competitions/{UUID}` 同域绝对 URL。 |
+| `get_aijspt_tzgg` | `limit` | `int` | `20` | 要请求的通知数量，必须为正整数。 |
+| 所有 `get_ai_*`、`search_ai` 和 `get_aijspt_*` 便捷函数 | `client` | `GdufClient | None` | `None` | 仅限关键字传入；复用已有客户端可共享连接。省略时函数会自动创建并关闭客户端。 |
+
+`get_aijspt_bslb` 的多个筛选参数使用 AND 关系，即返回同时满足所有已传条件的比赛，并保持平台原始排序。`None` 表示不启用对应筛选。
+
+竞赛状态使用平台原始值，包括 `registration_open`（报名中）、`previous_recording`（往期比赛补录中）、`upcoming`（即将开始）、`in_progress`（进行中）和 `finished`（已结束）。平台时间解析为带时区的 `datetime`，列表接口无分页，返回 `ListResult`。
+
+```python
+from gduf_web_api import get_aijspt_bslb, get_aijspt_bsxq
+
+competitions = get_aijspt_bslb(category="软件设计类", keyword="软件杯")
+detail = get_aijspt_bsxq(competitions.items[0])
+
+print(detail.description_text)
+for phase in detail.timeline:
+    print(phase.date, phase.label, phase.description)
+```
+
 网页控制每页条目数，因此分页方法只接收从 1 开始的 `page`，不接收 `page_size`。
 
 ## 复用连接与异常
@@ -108,7 +151,7 @@ python -m build
 twine check dist/*
 ```
 
-网络请求、模型和异常由 `GdufClient` 共享；每个学院只实现内部来源适配器，并通过稳定的来源前缀便捷函数导出。新增来源不应修改现有 `get_ai_*` 行为。
+网络请求、模型和异常由 `GdufClient` 共享；学院官网来源与竞赛信息来源使用各自的内部适配器协议，并通过稳定的来源前缀便捷函数导出。新增来源不应修改现有 `get_ai_*` 或 `get_aijspt_*` 行为。
 
 ## GitHub Actions 发布
 

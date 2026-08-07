@@ -41,7 +41,7 @@ flowchart LR
 | `front_end/web` | 浏览器界面、登录状态与结构化结果展示 | React 18、TypeScript、Vite、Ant Design、Axios |
 | `back_end/backend` | API、会话管理、Agent 编排、知识检索 | Python 3.10+、FastAPI、PydanticAI、Pydantic Settings |
 | `back_end/gduf-jwxt-api` | 教务系统登录与旧版 JSP 页面解析 | httpx、Beautiful Soup 4 |
-| `back_end/gduf-web-api` | 学院官网公开内容抓取与搜索 | httpx、Beautiful Soup 4 |
+| `back_end/gduf-web-api` | 学院官网公开内容抓取与搜索、竞赛平台公开信息检索 | httpx、Beautiful Soup 4 |
 | `back_end/gduf-academic-api` | 学术资源平台聚合检索（arXiv、Semantic Scholar 等） | httpx |
 
 ## 快速开始
@@ -171,7 +171,7 @@ X-Session-Token: <session_token>
 后端测试覆盖 API 基础行为、知识检索、Agent 工具注册、教务客户端解析、官网适配层、空闲教室过滤、纯文本降级、对话记忆等。运行：
 
 ```powershell
-# 后端服务测试（41 个用例）
+# 后端服务测试（48 个用例）
 cd back_end\backend
 .\.venv\Scripts\python -m pytest
 
@@ -192,13 +192,13 @@ cd ..\..\front_end\web
 npm run build
 ```
 
-教务客户端的大多数测试使用 `httpx.MockTransport` 模拟上游，不需要真实学号、密码或网络访问。官网客户端测试使用预录制的 HTML fixture 文件。学术资源客户端测试使用 MockTransport 模拟 arXiv XML 与 Semantic Scholar JSON 响应。`tests/test_real_responses.py` 另外依赖本地响应样本文件，未补充样本时应跳过此项测试。
+教务客户端的大多数测试使用 `httpx.MockTransport` 模拟上游，不需要真实学号、密码或网络访问。官网客户端测试使用预录制的 HTML/JSON fixture 文件（含学院官网与竞赛平台页面）。学术资源客户端测试使用 MockTransport 模拟 arXiv XML 与 Semantic Scholar JSON 响应。`tests/test_real_responses.py` 另外依赖本地响应样本文件，未补充样本时应跳过此项测试。
 
 ## 资料维护与当前限制
 
 - `back_end/backend/data/knowledge/` 存放制度、培养方案等 Markdown 资料；`data/information/` 存放学院资讯和竞赛信息。项目根目录 `resources/` 存放原始 PDF/docx 资料文件，可通过 API 浏览目录树与下载/预览。
 - 当前检索属于零额外依赖的关键词检索，不是向量数据库；资料需人工更新。
-- 学院资讯和竞赛信息目前为本地静态示例数据；学院官网公开内容已通过 `gduf-web-api` 实现实时搜索（`search_website` 工具），无需依赖本地爬取。
+- 学院资讯目前为本地静态示例数据；学院官网公开内容已通过 `gduf-web-api` 实现实时搜索（`search_website` 工具）；竞赛平台公开信息（比赛列表/详情/通知/社团）已通过 `gduf-web-api` 的适配层接入（对话工具待开发）。
 - 教务解析依赖学校旧版 JSP 页面的结构；若页面改版，`gduf-jwxt-api` 的解析器需要同步维护。
 - AI 对话必须成功配置并能访问模型服务；教务功能还受学校系统可用性影响。
 

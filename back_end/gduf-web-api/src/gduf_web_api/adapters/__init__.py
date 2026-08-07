@@ -1,6 +1,5 @@
 """Website source adapters."""
 
-from gduf_web_api.adapters.base import SourceAdapter
+from gduf_web_api.adapters.base import CompetitionSourceAdapter, SourceAdapter
 
-__all__ = ["SourceAdapter"]
-
+__all__ = ["CompetitionSourceAdapter", "SourceAdapter"]

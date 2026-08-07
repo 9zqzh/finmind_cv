@@ -1,6 +1,6 @@
 # 学院教学小助手
 
-面向广东金融学院学生的教学信息助手。项目将教务系统查询、学院官网公开信息检索、学院制度与资料检索，以及基于大模型的自然语言对话整合到一个 Web 应用中：学生既可以通过页面查询课表和成绩，也可以在对话中用自然语言提问，系统自动选择工具并以结构化卡片展示结果。支持多轮对话记忆与流式输出。
+面向广东金融学院学生的教学信息助手。项目将教务系统查询、学院官网公开信息检索、学术资源搜索（arXiv/Semantic Scholar）、学院制度与资料检索，以及基于大模型的自然语言对话整合到一个 Web 应用中：学生既可以通过页面查询课表和成绩，也可以在对话中用自然语言提问，系统自动选择工具并以结构化卡片展示结果。支持多轮对话记忆与流式输出。
 
 > 这是一个学习/原型项目，并非学校官方系统或 SDK。涉及个人数据的查询依赖真实教务系统，使用时请遵守学校的信息系统使用规范。
 
@@ -10,7 +10,8 @@
 - **个人教学信息**：查询个人课表、成绩及成绩明细、专业培养方案。
 - **教室查询**：按学期、校区、教学楼和教学周查看教室占用课表；支持查询空闲教室。
 - **官网信息搜索**：关键词搜索学院官网公开内容（新闻、通知、师资、专业介绍等），实时来自学院官网。
-- **AI 对话**：由 PydanticAI 驱动，按问题自动选择教务或检索工具，将结果以结构化卡片展示；支持多轮对话记忆与 SSE 流式输出。
+- **学术资源搜索**：从 arXiv、Semantic Scholar 等开放学术平台检索论文与文献，返回标题、作者、摘要、页面链接与 PDF 下载地址。
+- **AI 对话**：由 PydanticAI 驱动，按问题自动选择工具（10 个工具），将结果以结构化卡片展示；支持多轮对话记忆与 SSE 流式输出。
 - **知识与资讯检索**：检索本地 Markdown、文本和 JSON 资料，结果附带来源。
 
 ## 架构
@@ -21,11 +22,14 @@ flowchart LR
   API --> Agent["PydanticAI Agent"]
   API --> Adapter["教务适配层"]
   API --> WebAdapter["官网适配层"]
+  API --> AcademicAdapter["学术资源适配层"]
   Agent --> Adapter
   Agent --> WebAdapter
+  Agent --> AcademicAdapter
   Agent --> Search["轻量知识检索"]
   Adapter --> JWXT["广东金融学院教务系统"]
   WebAdapter --> WEB["学院官网 (gduf-web-api)"]
+  AcademicAdapter --> ACADEMIC["学术平台 (gduf-academic-api)"]
   Search --> Data["本地知识库与资讯资料"]
   Agent --> LLM["DeepSeek（OpenAI 兼容接口）"]
 ```
@@ -38,6 +42,7 @@ flowchart LR
 | `back_end/backend` | API、会话管理、Agent 编排、知识检索 | Python 3.10+、FastAPI、PydanticAI、Pydantic Settings |
 | `back_end/gduf-jwxt-api` | 教务系统登录与旧版 JSP 页面解析 | httpx、Beautiful Soup 4 |
 | `back_end/gduf-web-api` | 学院官网公开内容抓取与搜索 | httpx、Beautiful Soup 4 |
+| `back_end/gduf-academic-api` | 学术资源平台聚合检索（arXiv、Semantic Scholar 等） | httpx |
 
 ## 快速开始
 
@@ -60,6 +65,7 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[test]"
 python -m pip install -e ..\gduf-jwxt-api
 python -m pip install -e ..\gduf-web-api
+python -m pip install -e ..\gduf-academic-api
 Copy-Item .env.example .env
 ```
 
@@ -109,6 +115,7 @@ npm run dev
 | `AGENT_MAX_ITERATIONS` | `4` | Agent 最大工具调用轮次（当前作为配置保留） |
 | `AGENT_TIMEOUT_SECONDS` | `30` | Agent 超时配置（当前由模型客户端请求超时控制） |
 | `JWXT_BASE_URL` | `https://jwxt.gduf.edu.cn` | 教务系统根地址 |
+| `ACADEMIC_PROXY` | 空 | 学术资源平台代理地址（如 `http://127.0.0.1:7890`），留空直连 |
 | `SESSION_TTL_MINUTES` | `120` | 后端内存会话的空闲过期时间（分钟） |
 | `KNOWLEDGE_DIR` | `data/knowledge` | 知识库资料目录 |
 | `INFORMATION_DIR` | `data/information` | 学院资讯与竞赛资料目录 |
@@ -156,7 +163,7 @@ X-Session-Token: <session_token>
 - 登录用户支持多轮对话记忆（滑动窗口最近 6 轮），记忆随会话过期自动清理。
 - 验证码与教务系统的 `JSESSIONID` 绑定，获取验证码与登录必须使用同一会话。
 - 项目不会持久化学号和密码；前端仅将会话令牌保存在浏览器 `sessionStorage`。
-- Agent 通过 9 个工具获取真实数据（教务查询、官网搜索、知识库检索等），避免直接编造；未登录时会返回相应提示。
+- Agent 通过 10 个工具获取真实数据（教务查询、官网搜索、学术资源搜索、知识库检索等），避免直接编造；未登录时会返回相应提示。
 - 当前 CORS 为开发方便配置为允许全部来源。部署前应收紧 `allow_origins`，并将内存会话替换为适合生产环境的会话存储方案。
 
 ## 测试与构建
@@ -164,7 +171,7 @@ X-Session-Token: <session_token>
 后端测试覆盖 API 基础行为、知识检索、Agent 工具注册、教务客户端解析、官网适配层、空闲教室过滤、纯文本降级、对话记忆等。运行：
 
 ```powershell
-# 后端服务测试（34 个用例）
+# 后端服务测试（41 个用例）
 cd back_end\backend
 .\.venv\Scripts\python -m pytest
 
@@ -176,12 +183,16 @@ cd ..\gduf-jwxt-api
 cd ..\gduf-web-api
 ..\backend\.venv\Scripts\python -m pytest -o addopts=""
 
+# 学术资源客户端测试
+cd ..\gduf-academic-api
+..\backend\.venv\Scripts\python -m pytest -o addopts=""
+
 # 前端类型检查与生产构建
 cd ..\..\front_end\web
 npm run build
 ```
 
-教务客户端的大多数测试使用 `httpx.MockTransport` 模拟上游，不需要真实学号、密码或网络访问。官网客户端测试使用预录制的 HTML fixture 文件。`tests/test_real_responses.py` 另外依赖本地响应样本文件，未补充样本时应跳过此项测试。
+教务客户端的大多数测试使用 `httpx.MockTransport` 模拟上游，不需要真实学号、密码或网络访问。官网客户端测试使用预录制的 HTML fixture 文件。学术资源客户端测试使用 MockTransport 模拟 arXiv XML 与 Semantic Scholar JSON 响应。`tests/test_real_responses.py` 另外依赖本地响应样本文件，未补充样本时应跳过此项测试。
 
 ## 资料维护与当前限制
 
@@ -196,6 +207,7 @@ npm run build
 - [后端说明](back_end/backend/README.md)
 - [教务客户端 API 说明](back_end/gduf-jwxt-api/README.md)
 - [官网客户端说明](back_end/gduf-web-api/README.md)
+- [学术资源客户端说明](back_end/gduf-academic-api/README.md)
 - [业务功能说明](docs/业务功能说明.md)
 - [技术栈说明](docs/技术栈说明.md)
 - [项目结构说明](docs/项目结构说明.md)

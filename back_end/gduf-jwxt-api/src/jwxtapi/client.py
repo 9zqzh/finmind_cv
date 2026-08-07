@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import ssl
 import threading
 import time
 from collections.abc import Mapping
@@ -49,10 +50,20 @@ class JwxtClient:
         timeout: float = 15.0,
         *,
         transport: httpx.BaseTransport | None = None,
+        verify_ssl: bool = False,
     ) -> None:
         if timeout <= 0:
             raise ValidationError("timeout 必须大于 0")
         self._lock = threading.RLock()
+        # 教务系统 SSL 配置可能较旧，需要放宽 SSL 验证
+        if transport is None:
+            ctx = ssl.create_default_context()
+            if not verify_ssl:
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+            # 允许较旧的 TLS 版本（TLS 1.0+）
+            ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+            transport = httpx.HTTPTransport(verify=ctx)
         self._client = httpx.Client(
             base_url=base_url.rstrip("/"),
             timeout=timeout,

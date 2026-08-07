@@ -14,6 +14,7 @@ from typing import Annotated, Any
 from pydantic import Field
 from pydantic_ai import Agent, RunContext
 
+from app.adapters import academic as academic_adapter
 from app.adapters import gduf_web as gduf_web_adapter
 from app.adapters import jwxt as jwxt_adapter
 from app.knowledge import KnowledgeService
@@ -31,6 +32,7 @@ RESULT_TYPES: dict[str, str] = {
     "search_knowledge": "knowledge",
     "search_information": "information",
     "search_website": "website",
+    "search_academic": "academic",
 }
 
 
@@ -253,6 +255,33 @@ def register_tools(agent: Agent) -> None:
         except ApiError as exc:
             return _record_failure(ctx, "search_website", exc.message)
         _record_success(ctx, "search_website", data)
+        return data
+
+    @agent.tool
+    async def search_academic(
+        ctx: RunContext[AgentDeps],
+        query: Annotated[
+            str,
+            Field(
+                description="要在学术平台检索的关键词，学术论文建议优先用英文关键词（如 deep learning）"
+            ),
+        ],
+        sources: list[str] | None = Field(
+            default=None,
+            description="限定搜索平台，可选 arxiv、semantic_scholar；不传表示全部平台",
+        ),
+        max_results: int = Field(
+            default=5, description="每个平台返回的最大条目数（1-10）"
+        ),
+    ) -> dict[str, Any]:
+        """搜索学术资源平台（arXiv、Semantic Scholar）获取论文与文献资料，返回标题、作者、年份、摘要、论文页面链接与 PDF 下载入口。调用时机：用户需要查找学术论文、研究资料、文献综述、学术资源等（如“有没有关于深度学习的论文”“帮我找几篇强化学习的文献”）。调用后用自己的话总结推荐结果：逐篇说明论文主题与研究要点，并给出页面链接与 PDF 下载地址，不要输出原始 JSON。本工具结果仅供你组织回复，前端不展示结构化数据。"""
+        try:
+            data = await academic_adapter.search_academic_resources(
+                query, sources=sources, max_results=min(max(max_results, 1), 10)
+            )
+        except ApiError as exc:
+            return _record_failure(ctx, "search_academic", exc.message)
+        _record_success(ctx, "search_academic", data)
         return data
 
 

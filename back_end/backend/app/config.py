@@ -33,6 +33,10 @@ class Settings(BaseSettings):
         default="https://jwxt.gduf.edu.cn", alias="JWXT_BASE_URL"
     )
 
+    # 学术资源平台（arXiv/Semantic Scholar 等境外平台可能需要代理）
+    # 例如：ACADEMIC_PROXY=http://127.0.0.1:7890；留空表示直连
+    academic_proxy: str = Field(default="", alias="ACADEMIC_PROXY")
+
     # Web 服务
     app_env: str = Field(default="development", alias="APP_ENV")
     session_ttl_minutes: int = Field(default=120, alias="SESSION_TTL_MINUTES")

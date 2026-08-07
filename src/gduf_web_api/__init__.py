@@ -17,6 +17,10 @@ from gduf_web_api.api import (
     get_ai_xyxw,
     get_ai_yytjx,
     get_ai_zrjs,
+    get_aijspt_bslb,
+    get_aijspt_bsxq,
+    get_aijspt_stlb,
+    get_aijspt_tzgg,
     search_ai,
 )
 from gduf_web_api.client import GdufClient
@@ -27,21 +31,43 @@ from gduf_web_api.errors import (
     ParseError,
     UnsupportedSourceError,
 )
-from gduf_web_api.models import AiHome, ArticleSummary, ContentDetail, PageResult, PersonSummary
+from gduf_web_api.models import (
+    AiHome,
+    ArticleSummary,
+    ClubSummary,
+    CompetitionDetail,
+    CompetitionFaq,
+    CompetitionSummary,
+    CompetitionTimelineItem,
+    ContentDetail,
+    ListResult,
+    Notice,
+    PageResult,
+    PersonSummary,
+    ResourceLink,
+)
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 
 __all__ = [
     "AiHome",
     "ArticleSummary",
+    "ClubSummary",
+    "CompetitionDetail",
+    "CompetitionFaq",
+    "CompetitionSummary",
+    "CompetitionTimelineItem",
     "ContentDetail",
     "GdufClient",
     "GdufError",
     "InvalidPageError",
+    "ListResult",
     "NetworkError",
+    "Notice",
     "PageResult",
     "ParseError",
     "PersonSummary",
+    "ResourceLink",
     "UnsupportedSourceError",
     "get_ai_detail",
     "get_ai_home",
@@ -59,5 +85,9 @@ __all__ = [
     "get_ai_xyxw",
     "get_ai_yytjx",
     "get_ai_zrjs",
+    "get_aijspt_bslb",
+    "get_aijspt_bsxq",
+    "get_aijspt_stlb",
+    "get_aijspt_tzgg",
     "search_ai",
 ]

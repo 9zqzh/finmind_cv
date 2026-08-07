@@ -1,0 +1,17 @@
+{
+  "notices": [
+    {
+      "id": "a1b808e3-9de7-4e80-b4c1-e22f574c62f4",
+      "competitionId": null,
+      "competitionTitle": null,
+      "title": "关于要求补充指导老师的通知",
+      "content": "请参赛队伍按要求补充指导老师信息。",
+      "priority": "normal",
+      "deliveryScope": "global",
+      "allowPopup": false,
+      "publishedAt": "2026-07-20T03:27:49.461Z",
+      "expiresAt": null,
+      "updatedAt": "2026-07-20T03:27:49.487Z"
+    }
+  ]
+}

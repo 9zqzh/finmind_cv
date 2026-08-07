@@ -51,9 +51,6 @@ desktop.ini
 .ipynb_checkpoints/
 
 # ============ snapshot ============
-snapshot-2026-08-06T10-03-02-505Z
-snapshot-2026-08-06T11-34-54-017Z
-snapshot-2026-08-06T11-39-39-361Z
+snapshot-*/
 
-# ============ snapshot ============
 gduf_web_api_output.json

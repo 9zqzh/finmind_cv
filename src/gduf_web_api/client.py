@@ -12,15 +12,20 @@ from gduf_web_api.errors import NetworkError, UnsupportedSourceError
 from gduf_web_api.models import (
     AiHome,
     ArticleSummary,
+    ClubSummary,
+    CompetitionDetail,
+    CompetitionSummary,
     ContentDetail,
+    ListResult,
+    Notice,
     PageResult,
     PersonSummary,
 )
 
 if TYPE_CHECKING:
-    from gduf_web_api.adapters.base import SourceAdapter
+    from gduf_web_api.adapters.base import CompetitionSourceAdapter, SourceAdapter
 
-DEFAULT_USER_AGENT = "gduf-web-api/0.1.1 (+https://pypi.org/project/gduf-web-api/)"
+DEFAULT_USER_AGENT = "gduf-web-api/0.2.0 (+https://pypi.org/project/gduf-web-api/)"
 
 
 class GdufClient:
@@ -46,8 +51,12 @@ class GdufClient:
             transport=transport,
         )
         from gduf_web_api.adapters.ai import AiAdapter
+        from gduf_web_api.adapters.aijspt import AijsptAdapter
 
         self._adapters: dict[str, SourceAdapter] = {"ai": AiAdapter(self)}
+        self._competition_adapters: dict[str, CompetitionSourceAdapter] = {
+            "aijspt": AijsptAdapter(self)
+        }
 
     @property
     def is_closed(self) -> bool:
@@ -67,6 +76,12 @@ class GdufClient:
             return self._adapters[source]
         except KeyError as exc:
             raise UnsupportedSourceError(f"unsupported source: {source!r}") from exc
+
+    def _competition_adapter(self, source: str) -> CompetitionSourceAdapter:
+        try:
+            return self._competition_adapters[source]
+        except KeyError as exc:
+            raise UnsupportedSourceError(f"unsupported competition source: {source!r}") from exc
 
     def _request_text(
         self,
@@ -132,3 +147,35 @@ class GdufClient:
         self, keyword: str, page: int = 1, *, source: str = "ai"
     ) -> PageResult[ArticleSummary]:
         return self._adapter(source).search(keyword, page)
+
+    def get_competitions(
+        self,
+        *,
+        year: int | None = None,
+        status: str | None = None,
+        category: str | None = None,
+        department: str | None = None,
+        keyword: str | None = None,
+        source: str = "aijspt",
+    ) -> ListResult[CompetitionSummary]:
+        return self._competition_adapter(source).get_competitions(
+            year=year,
+            status=status,
+            category=category,
+            department=department,
+            keyword=keyword,
+        )
+
+    def get_competition_detail(
+        self,
+        competition_or_id: CompetitionSummary | str,
+        *,
+        source: str = "aijspt",
+    ) -> CompetitionDetail:
+        return self._competition_adapter(source).get_competition_detail(competition_or_id)
+
+    def get_notices(self, limit: int = 20, *, source: str = "aijspt") -> ListResult[Notice]:
+        return self._competition_adapter(source).get_notices(limit)
+
+    def get_clubs(self, *, source: str = "aijspt") -> ListResult[ClubSummary]:
+        return self._competition_adapter(source).get_clubs()

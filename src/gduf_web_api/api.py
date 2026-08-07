@@ -9,7 +9,12 @@ from gduf_web_api.client import GdufClient
 from gduf_web_api.models import (
     AiHome,
     ArticleSummary,
+    ClubSummary,
+    CompetitionDetail,
+    CompetitionSummary,
     ContentDetail,
+    ListResult,
+    Notice,
     PageResult,
     PersonSummary,
 )
@@ -105,3 +110,51 @@ def get_ai_detail(
 ) -> ContentDetail:
     return _using(client, lambda active: active.get_detail(item_or_url, source="ai"))
 
+
+def get_aijspt_bslb(
+    *,
+    year: int | None = None,
+    status: str | None = None,
+    category: str | None = None,
+    department: str | None = None,
+    keyword: str | None = None,
+    client: GdufClient | None = None,
+) -> ListResult[CompetitionSummary]:
+    """Get the competition list (比赛列表) with optional local filters."""
+
+    return _using(
+        client,
+        lambda active: active.get_competitions(
+            year=year,
+            status=status,
+            category=category,
+            department=department,
+            keyword=keyword,
+            source="aijspt",
+        ),
+    )
+
+
+def get_aijspt_bsxq(
+    competition_or_id: CompetitionSummary | str,
+    *,
+    client: GdufClient | None = None,
+) -> CompetitionDetail:
+    """Get one competition's public detail (比赛详情)."""
+
+    return _using(
+        client,
+        lambda active: active.get_competition_detail(competition_or_id, source="aijspt"),
+    )
+
+
+def get_aijspt_tzgg(limit: int = 20, *, client: GdufClient | None = None) -> ListResult[Notice]:
+    """Get published platform notices (通知公告)."""
+
+    return _using(client, lambda active: active.get_notices(limit, source="aijspt"))
+
+
+def get_aijspt_stlb(*, client: GdufClient | None = None) -> ListResult[ClubSummary]:
+    """Get the public student-club list (社团列表)."""
+
+    return _using(client, lambda active: active.get_clubs(source="aijspt"))

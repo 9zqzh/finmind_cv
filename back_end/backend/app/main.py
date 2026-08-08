@@ -14,7 +14,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import auth, chat, jwxt, knowledge, resources
+from app.api import auth, chat, competitions, jwxt, knowledge, resources
 from app.config import get_settings
 from app.knowledge import KnowledgeService
 from app.schemas.common import INVALID_PARAM, ApiError, fail, ok
@@ -55,6 +55,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(chat.router)
+app.include_router(competitions.router)
 app.include_router(jwxt.router)
 app.include_router(knowledge.router)
 app.include_router(resources.router)

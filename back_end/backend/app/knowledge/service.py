@@ -17,6 +17,7 @@ from pathlib import Path
 _WORD_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_\-\.]*")
 _CJK_RE = re.compile(r"[\u4e00-\u9fff]")
 _HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+_SOURCE_FILE_RE = re.compile(r"^>\s*来源文件：resources/(.+?)\s*$", re.MULTILINE)
 _SUPPORTED_SUFFIXES = {".md", ".txt", ".json"}
 # 无实义的语气助词：包含这些字的二元组不作为检索词，减少噪声命中
 _STOP_CHARS = set("的了吗呢吧啊哦嗯")
@@ -40,6 +41,7 @@ class Chunk:
     text: str
     source: str  # 来源文件名
     title: str = ""  # 所属标题（Markdown 一级/二级标题或文件名）
+    resource_path: str | None = None  # 对应的原始资料文件相对路径
 
 
 @dataclass
@@ -50,6 +52,7 @@ class SearchResult:
     source: str
     title: str
     score: float
+    resource_path: str | None = None
 
 
 @dataclass
@@ -84,9 +87,11 @@ class KnowledgeService:
         if path.suffix.lower() == ".json":
             self._load_json(path.name, raw)
         else:
-            self._load_text(path.name, raw)
+            source_file = _SOURCE_FILE_RE.search(raw)
+            resource_path = source_file.group(1) if source_file else None
+            self._load_text(path.name, raw, resource_path)
 
-    def _load_text(self, source: str, raw: str) -> None:
+    def _load_text(self, source: str, raw: str, resource_path: str | None) -> None:
         title = source
         current_title = title
         buffer: list[str] = []
@@ -94,14 +99,14 @@ class KnowledgeService:
             stripped = line.strip()
             if stripped.startswith("#"):
                 # 标题行之前的缓冲先落盘
-                self._flush_buffer(source, current_title, buffer)
+                self._flush_buffer(source, current_title, buffer, resource_path)
                 current_title = stripped.lstrip("#").strip() or title
                 continue
             # 元信息行（如来源文件标注）不进入检索内容，避免路径文字干扰命中
             if stripped.startswith(">"):
                 continue
             buffer.append(line)
-        self._flush_buffer(source, current_title, buffer)
+        self._flush_buffer(source, current_title, buffer, resource_path)
 
     def _load_json(self, source: str, raw: str) -> None:
         payload = json.loads(raw)
@@ -115,7 +120,13 @@ class KnowledgeService:
             if text.strip():
                 self.chunks.append(Chunk(text=text, source=source, title=title))
 
-    def _flush_buffer(self, source: str, title: str, buffer: list[str]) -> None:
+    def _flush_buffer(
+        self,
+        source: str,
+        title: str,
+        buffer: list[str],
+        resource_path: str | None = None,
+    ) -> None:
         # 按空行分段落切片：段落是自然的语义单元，比固定长度硬切更完整
         paragraphs: list[str] = []
         current: list[str] = []
@@ -133,7 +144,14 @@ class KnowledgeService:
             for start in range(0, len(paragraph), CHUNK_MAX_CHARS):
                 piece = paragraph[start : start + CHUNK_MAX_CHARS].strip()
                 if piece:
-                    self.chunks.append(Chunk(text=piece, source=source, title=title))
+                    self.chunks.append(
+                        Chunk(
+                            text=piece,
+                            source=source,
+                            title=title,
+                            resource_path=resource_path,
+                        )
+                    )
 
     # ---- 检索 ----
 
@@ -167,6 +185,7 @@ class KnowledgeService:
                     source=chunk.source,
                     title=chunk.title,
                     score=score,
+                    resource_path=chunk.resource_path,
                 )
             )
         results.sort(key=lambda item: item.score, reverse=True)

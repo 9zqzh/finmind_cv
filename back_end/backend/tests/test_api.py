@@ -51,11 +51,12 @@ def test_login_with_bad_token(client):
 
 
 def test_knowledge_search_with_sample_data(client):
-    response = client.get("/api/knowledge/search", params={"q": "缓考"})
+    response = client.get("/api/knowledge/search", params={"q": "课程重修"})
     assert response.status_code == 200
     body = response.json()
     assert body["success"] is True
     assert body["data"]["results"]
+    assert body["data"]["results"][0]["resource_path"]
 
 
 def test_knowledge_search_not_found(client):

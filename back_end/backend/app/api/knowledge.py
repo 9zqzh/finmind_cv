@@ -11,8 +11,26 @@ from app.schemas.common import KNOWLEDGE_NOT_FOUND, ApiError, ok
 router = APIRouter(prefix="/api", tags=["knowledge"])
 
 
-def _search_payload(service: KnowledgeService, query: str, top_k: int) -> dict:
-    results = service.search(query, top_k=top_k)
+def _search_payload(
+    service: KnowledgeService,
+    query: str,
+    top_k: int,
+    *,
+    files_only: bool = False,
+) -> dict:
+    results = service.search(
+        query,
+        top_k=max(top_k, len(service.chunks)) if files_only else top_k,
+    )
+    if files_only:
+        unique_results = []
+        seen_sources: set[str] = set()
+        for result in results:
+            source_key = result.resource_path or result.source
+            if source_key not in seen_sources:
+                unique_results.append(result)
+                seen_sources.add(source_key)
+        results = unique_results[:top_k]
     if not results:
         raise ApiError(
             KNOWLEDGE_NOT_FOUND,
@@ -22,7 +40,13 @@ def _search_payload(service: KnowledgeService, query: str, top_k: int) -> dict:
     return {
         "query": query,
         "results": [
-            {"text": r.text, "source": r.source, "title": r.title, "score": r.score}
+            {
+                "text": r.text,
+                "source": r.source,
+                "title": r.title,
+                "score": r.score,
+                "resource_path": r.resource_path,
+            }
             for r in results
         ],
         "sources": sorted({f"{r.source}#{r.title}" for r in results}),
@@ -36,7 +60,7 @@ async def knowledge_search(
     service: KnowledgeService = Depends(get_knowledge),
 ):
     """检索学院知识库（制度、培养方案说明、基本信息等）。"""
-    return ok(_search_payload(service, q, top_k))
+    return ok(_search_payload(service, q, top_k, files_only=True))
 
 
 @router.get("/information/search")

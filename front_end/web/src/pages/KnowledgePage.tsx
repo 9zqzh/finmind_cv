@@ -19,6 +19,7 @@ import {
   FileTextOutlined,
   FileWordOutlined,
   FolderOutlined,
+  LinkOutlined,
 } from "@ant-design/icons";
 import { api, ApiBizError } from "../api/client";
 import type { ResourceFile, ResourceTree, SearchData } from "../api/types";
@@ -148,7 +149,7 @@ export default function KnowledgePage() {
     <Card title="知识库（办事流程 / 规章制度）">
       <Space direction="vertical" style={{ width: "100%" }}>
         <Typography.Text type="secondary">
-          检索制度、办事流程、培养方案等知识，点击下方文件可直接查看或下载原始资料。
+          输入关键词后，直接打开命中的原始资料文件。
         </Typography.Text>
         <Space.Compact style={{ width: "100%" }}>
           <Input
@@ -167,22 +168,42 @@ export default function KnowledgePage() {
           </Typography.Text>
         )}
         <List
-          itemLayout="vertical"
           dataSource={result?.results ?? []}
           renderItem={(item) => (
             <List.Item
-              key={item.title + item.source}
-              extra={item.score !== undefined && <Tag>相关度 {item.score.toFixed(1)}</Tag>}
+              key={item.resource_path ?? item.source}
+              actions={
+                item.resource_path
+                  ? [
+                      <Button
+                        key="preview"
+                        icon={<LinkOutlined />}
+                        onClick={() => window.open(api.resourceFileUrl(item.resource_path!), "_blank")}
+                      >
+                        预览文件
+                      </Button>,
+                    ]
+                  : undefined
+              }
             >
               <List.Item.Meta
-                title={item.title}
-                description={`来源：${item.source}`}
+                avatar={item.resource_path ? extIcon(item.resource_path.split(".").pop() ?? "") : <FileOutlined />}
+                title={
+                  item.resource_path ? (
+                    <a
+                      href={api.resourceFileUrl(item.resource_path)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {item.title}
+                    </a>
+                  ) : (
+                    item.title
+                  )
+                }
+                description={item.resource_path ? "点击文件名或“预览文件”打开原始资料" : `来源：${item.source}`}
               />
-              <Typography.Paragraph
-                style={{ whiteSpace: "pre-wrap", marginBottom: 0 }}
-              >
-                {item.text}
-              </Typography.Paragraph>
+              {item.score !== undefined && <Tag>相关度 {item.score.toFixed(1)}</Tag>}
             </List.Item>
           )}
         />

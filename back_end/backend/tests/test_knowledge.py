@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 
 from app.knowledge.chroma_store import ChromaVectorStore
 from app.knowledge import KnowledgeService
@@ -141,6 +142,24 @@ class FakeChromaClient:
 
 def _vector_store():
     return ChromaVectorStore("unused", "knowledge_test", client=FakeChromaClient())
+
+
+def test_chroma_store_uses_http_client_when_host_is_configured(monkeypatch):
+    client = FakeChromaClient()
+    captured = {}
+
+    class FakeChromaModule:
+        @staticmethod
+        def HttpClient(*, host, port):
+            captured.update(host=host, port=port)
+            return client
+
+    monkeypatch.setitem(sys.modules, "chromadb", FakeChromaModule)
+
+    store = ChromaVectorStore("unused", "knowledge_http_test", host="127.0.0.1", port=8001)
+
+    assert store.collection is client.collection
+    assert captured == {"host": "127.0.0.1", "port": 8001}
 
 
 def test_chunk_ids_are_stable_and_metadata_is_preserved(tmp_path):

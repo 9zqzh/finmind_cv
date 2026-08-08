@@ -31,16 +31,21 @@ class OpenAICompatibleEmbeddingProvider:
         api_key: str,
         model: str,
         timeout_seconds: float = 30.0,
+        batch_size: int = 10,
     ) -> None:
         self.endpoint = self._endpoint(base_url)
         self.api_key = api_key
         self.model = model
         self.timeout_seconds = timeout_seconds
+        self.batch_size = max(batch_size, 1)
 
     def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
         if not texts:
             return []
-        return self._request(list(texts))
+        vectors: list[list[float]] = []
+        for start in range(0, len(texts), self.batch_size):
+            vectors.extend(self._request(list(texts[start : start + self.batch_size])))
+        return vectors
 
     def embed_query(self, text: str) -> list[float]:
         vectors = self._request([text])

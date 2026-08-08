@@ -30,12 +30,17 @@ class ChromaVectorStore:
         collection_name: str,
         *,
         client: Any | None = None,
+        host: str = "",
+        port: int = 8001,
     ) -> None:
         if client is None:
             import chromadb
 
-            Path(persist_dir).mkdir(parents=True, exist_ok=True)
-            client = chromadb.PersistentClient(path=str(persist_dir))
+            if host:
+                client = chromadb.HttpClient(host=host, port=port)
+            else:
+                Path(persist_dir).mkdir(parents=True, exist_ok=True)
+                client = chromadb.PersistentClient(path=str(persist_dir))
         self.collection = client.get_or_create_collection(
             name=collection_name,
             metadata={"hnsw:space": "cosine"},

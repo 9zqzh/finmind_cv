@@ -66,6 +66,7 @@ class KnowledgeService:
     chunks: list[Chunk] = field(default_factory=list)
     vector_store: Any | None = field(default=None, repr=False)
     embedding_provider: "EmbeddingProvider | None" = field(default=None, repr=False)
+    vector_min_score: float = field(default=0.75, repr=False)
     vector_enabled: bool = field(default=False, init=False)
 
     @classmethod
@@ -75,11 +76,13 @@ class KnowledgeService:
         *,
         vector_store: Any | None = None,
         embedding_provider: "EmbeddingProvider | None" = None,
+        vector_min_score: float = 0.75,
     ) -> "KnowledgeService":
         service = cls()
         service.load_directory(Path(directory))
         service.vector_store = vector_store
         service.embedding_provider = embedding_provider
+        service.vector_min_score = max(0.0, min(1.0, vector_min_score))
         service._build_vector_index()
         return service
 
@@ -194,7 +197,7 @@ class KnowledgeService:
     def _vector_search(self, query: str, top_k: int) -> list[SearchResult]:
         embedding = self.embedding_provider.embed_query(query)
         hits = self.vector_store.search(embedding, top_k)
-        return [
+        results = [
             SearchResult(
                 text=hit.text,
                 source=hit.source,
@@ -204,6 +207,7 @@ class KnowledgeService:
             )
             for hit in hits
         ]
+        return [result for result in results if result.score >= self.vector_min_score]
 
     def _keyword_search(self, query: str, top_k: int) -> list[SearchResult]:
         tokens = self._tokenize(query)

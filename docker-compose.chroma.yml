@@ -1,0 +1,12 @@
+services:
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: college-assistant-chroma
+    ports:
+      - "8001:8000"
+    environment:
+      IS_PERSISTENT: "TRUE"
+      ANONYMIZED_TELEMETRY: "FALSE"
+    volumes:
+      - ./back_end/backend/data/chroma:/chroma/chroma
+    restart: unless-stopped

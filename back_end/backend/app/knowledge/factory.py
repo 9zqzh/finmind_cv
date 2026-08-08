@@ -28,11 +28,17 @@ def build_knowledge_service(
 
             provider = OpenAICompatibleEmbeddingProvider(
                 base_url=settings.embedding_base_url,
-                api_key=settings.embedding_api_key,
+                api_key=settings.embedding_api_key_value,
                 model=settings.embedding_model,
                 timeout_seconds=settings.embedding_timeout_seconds,
+                batch_size=settings.embedding_batch_size,
             )
-            vector_store = ChromaVectorStore(chroma_dir, collection_name)
+            vector_store = ChromaVectorStore(
+                chroma_dir,
+                collection_name,
+                host=settings.chroma_host.strip(),
+                port=settings.chroma_port,
+            )
         except Exception:
             provider = None
             vector_store = None
@@ -40,4 +46,5 @@ def build_knowledge_service(
         directory,
         vector_store=vector_store,
         embedding_provider=provider,
+        vector_min_score=settings.knowledge_vector_min_score,
     )

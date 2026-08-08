@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -29,12 +30,19 @@ class Settings(BaseSettings):
         default="auto", alias="KNOWLEDGE_RETRIEVAL_MODE"
     )
     chroma_dir: str = Field(default="data/chroma", alias="CHROMA_DIR")
+    chroma_host: str = Field(default="", alias="CHROMA_HOST")
+    chroma_port: int = Field(default=8001, alias="CHROMA_PORT")
+    knowledge_vector_min_score: float = Field(
+        default=0.75, alias="KNOWLEDGE_VECTOR_MIN_SCORE"
+    )
     embedding_base_url: str = Field(default="", alias="EMBEDDING_BASE_URL")
     embedding_api_key: str = Field(default="", alias="EMBEDDING_API_KEY")
+    embedding_api_key_file: str = Field(default="", alias="EMBEDDING_API_KEY_FILE")
     embedding_model: str = Field(default="", alias="EMBEDDING_MODEL")
     embedding_timeout_seconds: float = Field(
         default=30.0, alias="EMBEDDING_TIMEOUT_SECONDS"
     )
+    embedding_batch_size: int = Field(default=10, alias="EMBEDDING_BATCH_SIZE")
 
     # Agent 运行参数
     agent_max_iterations: int = Field(default=4, alias="AGENT_MAX_ITERATIONS")
@@ -71,10 +79,35 @@ class Settings(BaseSettings):
             value.strip()
             for value in (
                 self.embedding_base_url,
-                self.embedding_api_key,
+                self.embedding_api_key_value,
                 self.embedding_model,
             )
         )
+
+    @property
+    def embedding_api_key_value(self) -> str:
+        """Return the direct key, or the first key-like line in a local key file."""
+        if self.embedding_api_key.strip():
+            return self.embedding_api_key.strip()
+        if not self.embedding_api_key_file.strip():
+            return ""
+        try:
+            lines = Path(self.embedding_api_key_file).read_text(
+                encoding="utf-8-sig"
+            ).splitlines()
+        except (OSError, UnicodeError):
+            return ""
+        for line in lines:
+            value = line.strip()
+            if (
+                len(value) >= 20
+                and " " not in value
+                and ":" not in value
+                and "：" not in value
+                and not value.lower().startswith(("http://", "https://"))
+            ):
+                return value
+        return ""
 
 
 @lru_cache

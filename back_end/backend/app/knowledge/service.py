@@ -13,6 +13,10 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from app.knowledge.embeddings import EmbeddingProvider
 
 _WORD_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_\-\.]*")
 _CJK_RE = re.compile(r"[\u4e00-\u9fff]")
@@ -60,11 +64,23 @@ class KnowledgeService:
     """基于关键词评分的检索服务。"""
 
     chunks: list[Chunk] = field(default_factory=list)
+    vector_store: Any | None = field(default=None, repr=False)
+    embedding_provider: "EmbeddingProvider | None" = field(default=None, repr=False)
+    vector_enabled: bool = field(default=False, init=False)
 
     @classmethod
-    def from_directory(cls, directory: str | Path) -> "KnowledgeService":
+    def from_directory(
+        cls,
+        directory: str | Path,
+        *,
+        vector_store: Any | None = None,
+        embedding_provider: "EmbeddingProvider | None" = None,
+    ) -> "KnowledgeService":
         service = cls()
         service.load_directory(Path(directory))
+        service.vector_store = vector_store
+        service.embedding_provider = embedding_provider
+        service._build_vector_index()
         return service
 
     # ---- 加载与切片 ----
@@ -156,6 +172,40 @@ class KnowledgeService:
     # ---- 检索 ----
 
     def search(self, query: str, top_k: int = 3) -> list[SearchResult]:
+        if self.vector_enabled:
+            try:
+                return self._vector_search(query, top_k)
+            except Exception:
+                self.vector_enabled = False
+        return self._keyword_search(query, top_k)
+
+    def _build_vector_index(self) -> None:
+        if not self.vector_store or not self.embedding_provider or not self.chunks:
+            return
+        try:
+            embeddings = self.embedding_provider.embed_documents(
+                [chunk.text for chunk in self.chunks]
+            )
+            self.vector_store.rebuild(self.chunks, embeddings)
+            self.vector_enabled = True
+        except Exception:
+            self.vector_enabled = False
+
+    def _vector_search(self, query: str, top_k: int) -> list[SearchResult]:
+        embedding = self.embedding_provider.embed_query(query)
+        hits = self.vector_store.search(embedding, top_k)
+        return [
+            SearchResult(
+                text=hit.text,
+                source=hit.source,
+                title=hit.title,
+                score=max(0.0, min(1.0, 1.0 - hit.distance / 2.0)),
+                resource_path=hit.resource_path,
+            )
+            for hit in hits
+        ]
+
+    def _keyword_search(self, query: str, top_k: int) -> list[SearchResult]:
         tokens = self._tokenize(query)
         if not tokens:
             return []

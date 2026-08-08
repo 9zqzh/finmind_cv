@@ -208,12 +208,19 @@ def register_tools(agent: Agent) -> None:
                 ctx, "search_knowledge", "当前知识库没有找到相关依据"
             )
         ctx.deps.sources.extend(
-            f"{r.source}#{r.title}" for r in results
+            r.resource_path or f"{r.source}#{r.title}" for r in results
         )
         data = {
             "query": query,
             "results": [
-                {"text": r.text, "source": r.source, "title": r.title} for r in results
+                {
+                    "text": r.text,
+                    "source": r.source,
+                    "title": r.title,
+                    "score": r.score,
+                    "resource_path": r.resource_path,
+                }
+                for r in results
             ],
         }
         _record_success(ctx, "search_knowledge", data)

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
+from types import SimpleNamespace
+
 import pytest
 from pydantic_ai import Agent
 from pydantic_ai.models.test import TestModel
@@ -93,3 +96,19 @@ def test_build_deps_fields():
     deps = build_deps(None, KnowledgeService(), KnowledgeService())
     assert deps.tool_events == []
     assert deps.last_result_type == "text"
+
+
+def test_search_knowledge_returns_score_and_resource_path(tmp_path):
+    (tmp_path / "重修流程.md").write_text(
+        "# 重修流程\n\n> 来源文件：resources/办事流程/重修流程.pdf\n\n课程重修申请流程。",
+        encoding="utf-8",
+    )
+    agent = _build_test_agent()
+    tool = agent._function_toolset.tools["search_knowledge"]
+    deps = AgentDeps(knowledge=KnowledgeService.from_directory(tmp_path))
+
+    result = asyncio.run(tool.function(SimpleNamespace(deps=deps), query="重修申请"))
+
+    assert result["results"][0]["score"] > 0
+    assert result["results"][0]["resource_path"] == "办事流程/重修流程.pdf"
+    assert deps.sources == ["办事流程/重修流程.pdf"]

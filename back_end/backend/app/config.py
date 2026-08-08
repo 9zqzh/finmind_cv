@@ -24,6 +24,18 @@ class Settings(BaseSettings):
     )
     deepseek_model: str = Field(default="deepseek-v4-flash", alias="DEEPSEEK_MODEL")
 
+    # Knowledge retrieval
+    knowledge_retrieval_mode: str = Field(
+        default="auto", alias="KNOWLEDGE_RETRIEVAL_MODE"
+    )
+    chroma_dir: str = Field(default="data/chroma", alias="CHROMA_DIR")
+    embedding_base_url: str = Field(default="", alias="EMBEDDING_BASE_URL")
+    embedding_api_key: str = Field(default="", alias="EMBEDDING_API_KEY")
+    embedding_model: str = Field(default="", alias="EMBEDDING_MODEL")
+    embedding_timeout_seconds: float = Field(
+        default=30.0, alias="EMBEDDING_TIMEOUT_SECONDS"
+    )
+
     # Agent 运行参数
     agent_max_iterations: int = Field(default=4, alias="AGENT_MAX_ITERATIONS")
     agent_timeout_seconds: float = Field(default=30.0, alias="AGENT_TIMEOUT_SECONDS")
@@ -51,6 +63,18 @@ class Settings(BaseSettings):
     def model_configured(self) -> bool:
         """是否已配置可用的模型密钥。"""
         return bool(self.deepseek_api_key.strip())
+
+    @property
+    def embedding_configured(self) -> bool:
+        """Whether all values needed by the embedding API are present."""
+        return all(
+            value.strip()
+            for value in (
+                self.embedding_base_url,
+                self.embedding_api_key,
+                self.embedding_model,
+            )
+        )
 
 
 @lru_cache

@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse
 from app.api import auth, chat, competitions, jwxt, knowledge, resources
 from app.config import get_settings
 from app.knowledge import KnowledgeService
+from app.knowledge.factory import build_knowledge_service
 from app.schemas.common import INVALID_PARAM, ApiError, fail, ok
 from app.services.session import SessionManager
 
@@ -28,8 +29,10 @@ async def lifespan(app: FastAPI):
     """应用启动时初始化会话管理器与知识库。"""
     settings = get_settings()
     app.state.sessions = SessionManager(settings)
-    app.state.knowledge = KnowledgeService.from_directory(
-        BASE_DIR / settings.knowledge_dir
+    app.state.knowledge = build_knowledge_service(
+        BASE_DIR / settings.knowledge_dir,
+        settings,
+        collection_name="knowledge",
     )
     app.state.information = KnowledgeService.from_directory(
         BASE_DIR / settings.information_dir

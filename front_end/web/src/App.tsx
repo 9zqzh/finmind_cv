@@ -9,6 +9,7 @@ import GradesPage from "./pages/GradesPage";
 import TrainingPlanPage from "./pages/TrainingPlanPage";
 import ClassroomSchedulePage from "./pages/ClassroomSchedulePage";
 import KnowledgePage from "./pages/KnowledgePage";
+import CompetitionPage from "./pages/CompetitionPage";
 import InformationPage from "./pages/InformationPage";
 
 function ProtectedLayout() {
@@ -40,6 +41,7 @@ export default function App() {
             <Route path="/classroom-schedule" element={<ClassroomSchedulePage />} />
             <Route path="/knowledge" element={<KnowledgePage />} />
             <Route path="/information" element={<InformationPage />} />
+            <Route path="/competition" element={<CompetitionPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

@@ -9,6 +9,7 @@ import {
   NotificationOutlined,
   ReadOutlined,
   ScheduleOutlined,
+  TrophyOutlined,
 } from "@ant-design/icons";
 import { useAuth } from "../context/AuthContext";
 import logo from "../assets/logo.jpg";
@@ -23,6 +24,7 @@ const menuItems = [
   { key: "/classroom-schedule", icon: <BookOutlined />, label: "教室课表" },
   { key: "/knowledge", icon: <DatabaseOutlined />, label: "知识库" },
   { key: "/information", icon: <NotificationOutlined />, label: "学院资讯" },
+  { key: "/competition", icon: <TrophyOutlined />, label: "竞赛信息" },
 ];
 
 export default function AppLayout() {

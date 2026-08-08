@@ -30,7 +30,7 @@ export default function InformationPage() {
   };
 
   return (
-    <Card title="学院资讯（通知 / 竞赛）">
+    <Card title="学院资讯（通知）">
       <Space direction="vertical" style={{ width: "100%" }}>
         <Space.Compact style={{ width: "100%" }}>
           <Input

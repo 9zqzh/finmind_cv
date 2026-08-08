@@ -141,4 +141,10 @@ export const api = {
   /** 资料文件下载/预览 URL */
   resourceFileUrl: (path: string) =>
     `/api/knowledge/files/download?path=${encodeURIComponent(path)}`,
+
+  /** 通用 GET 请求（用于后端代理转发外部 API） */
+  getExternal: async <T = unknown>(url: string) => {
+    const res = await client.get<ApiEnvelope<T>>(url);
+    return res.data.data as T;
+  },
 };

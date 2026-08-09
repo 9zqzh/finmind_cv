@@ -1,74 +1,138 @@
-import { useState } from "react";
-import { Button, Card, Input, List, message, Space, Tag, Typography } from "antd";
-import { api, ApiBizError } from "../api/client";
-import type { SearchData } from "../api/types";
+import { useEffect } from "react";
+import { Card, List, Typography, Spin, Tabs, Empty } from "antd";
+import {
+  BellOutlined,
+  ExperimentOutlined,
+  ReadOutlined,
+  TeamOutlined,
+} from "@ant-design/icons";
+import {
+  getInformationStore,
+  subscribeToInformationStore,
+  preloadInformationData,
+} from "../stores/informationStore";
+import { useSyncExternalStore } from "react";
 
-export default function InformationPage() {
-  const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<SearchData | null>(null);
+const CATEGORY_LABELS: Record<string, string> = {
+  xyxw: "学院新闻",
+  xshuhd: "学术活动",
+  xshenghd: "学生活动",
+  tzgg: "公告通知",
+};
 
-  const search = async () => {
-    const q = query.trim();
-    if (!q) {
-      message.warning("请输入搜索关键词");
-      return;
-    }
-    setLoading(true);
-    try {
-      setResult(await api.informationSearch(q));
-    } catch (error) {
-      if (error instanceof ApiBizError && error.code === "KNOWLEDGE_NOT_FOUND") {
-        setResult({ query: q, results: [], sources: [] });
-      } else {
-        const msg = error instanceof ApiBizError ? error.message : "搜索失败";
-        message.error(msg);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+const SECTION_ICONS: Record<string, React.ReactNode> = {
+  xyxw: <ReadOutlined />,
+  xshuhd: <ExperimentOutlined />,
+  xshenghd: <TeamOutlined />,
+  tzgg: <BellOutlined />,
+};
+
+function ArticleList({ items, category }: { items: { title: string; url: string; published_at: string | null; summary: string; image_url: string | null }[]; category: string }) {
+  if (items.length === 0) {
+    return <Empty description={`暂无${CATEGORY_LABELS[category] || category}`} />;
+  }
+
+  const simple = category === "xyxw";
 
   return (
-    <Card title="学院资讯（通知）">
-      <Space direction="vertical" style={{ width: "100%" }}>
-        <Space.Compact style={{ width: "100%" }}>
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onPressEnter={search}
-            placeholder="如：竞赛、讲座通知"
-          />
-          <Button type="primary" loading={loading} onClick={search}>
-            搜索
-          </Button>
-        </Space.Compact>
-        {result && result.results.length === 0 && (
-          <Typography.Text type="secondary">
-            未找到相关内容，换个关键词试试。
-          </Typography.Text>
-        )}
-        <List
-          itemLayout="vertical"
-          dataSource={result?.results ?? []}
-          renderItem={(item) => (
-            <List.Item
-              key={item.title + item.source}
-              extra={item.score !== undefined && <Tag>相关度 {item.score.toFixed(1)}</Tag>}
-            >
-              <List.Item.Meta
-                title={item.title}
-                description={`来源：${item.source}`}
+    <List
+      itemLayout="vertical"
+      dataSource={items}
+      renderItem={(item) => (
+        <List.Item
+          key={item.url}
+          extra={
+            item.image_url ? (
+              <img
+                width={140}
+                alt={item.title}
+                src={item.image_url}
+                style={{ objectFit: "cover", borderRadius: 6 }}
               />
-              <Typography.Paragraph
-                style={{ whiteSpace: "pre-wrap", marginBottom: 0 }}
+            ) : null
+          }
+        >
+          <List.Item.Meta
+            title={
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontSize: 15, fontWeight: 500 }}
               >
-                {item.text}
-              </Typography.Paragraph>
-            </List.Item>
+                {item.title}
+              </a>
+            }
+            description={
+              item.published_at ? (
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  {item.published_at}
+                </Typography.Text>
+              ) : null
+            }
+          />
+          {!simple && item.summary && (
+            <Typography.Paragraph
+              style={{ fontSize: 13, color: "#475467", margin: "8px 0 0" }}
+              ellipsis={{ rows: 3 }}
+            >
+              {item.summary}
+            </Typography.Paragraph>
           )}
-        />
-      </Space>
+        </List.Item>
+      )}
+    />
+  );
+}
+
+export default function InformationPage() {
+  const store = useSyncExternalStore(subscribeToInformationStore, getInformationStore);
+
+  useEffect(() => {
+    if (!store.loaded && !store.loading) {
+      preloadInformationData();
+    }
+  }, [store.loaded, store.loading]);
+
+  const sections = [
+    { key: "xyxw", label: "xyxw", icon: SECTION_ICONS.xyxw },
+    { key: "xshuhd", label: "xshuhd", icon: SECTION_ICONS.xshuhd },
+    { key: "xshenghd", label: "xshenghd", icon: SECTION_ICONS.xshenghd },
+    { key: "tzgg", label: "tzgg", icon: SECTION_ICONS.tzgg },
+  ];
+
+  if (store.loading && !store.loaded) {
+    return (
+      <Card title="学院资讯">
+        <div style={{ textAlign: "center", padding: "60px 0" }}>
+          <Spin size="large" tip="正在加载资讯..." />
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <Card title="学院资讯">
+      <Tabs
+        defaultActiveKey="xyxw"
+        items={sections.map((sec) => {
+          const items = (store as any)[sec.key] ?? [];
+          return {
+            key: sec.key,
+            label: (
+              <span>
+                {sec.icon} {CATEGORY_LABELS[sec.key] || sec.key}（{items.length}）
+              </span>
+            ),
+            children: (
+              <ArticleList
+                items={items}
+                category={sec.key}
+              />
+            ),
+          };
+        })}
+      />
     </Card>
   );
 }

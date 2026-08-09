@@ -32,6 +32,7 @@ RESULT_TYPES: dict[str, str] = {
     "search_knowledge": "knowledge",
     "search_information": "information",
     "search_website": "website",
+    "get_website_detail": "website_detail",
     "search_academic": "academic",
     "query_competitions": "competition",
     "query_competition_detail": "competition_detail",
@@ -260,12 +261,30 @@ def register_tools(agent: Agent) -> None:
         ],
         page: int = Field(default=1, description="结果页码，默认第 1 页"),
     ) -> dict[str, Any]:
-        """关键词搜索学院官网的公开内容（学院新闻、通知公告、学生活动、师资队伍、专业介绍等，实时来自官网）。调用时机：用户询问学院官网上的公开信息（如“学院最近有什么通知”“某位老师是谁”“学院有哪些专业”），且课表/成绩/培养方案/知识库等其他工具不适用时；检索后用自己的话总结提炼回答，不要照搬原文。注意：本工具结果仅供你组织回复，前端不会展示原始数据，请用自然语言汇总，不要输出 JSON。"""
+        """关键词搜索学院官网的公开内容（学院新闻、通知公告、学生活动、师资队伍、专业介绍等，实时来自官网）。返回结果的标题与链接列表（个别条目可能带简短摘要）。调用时机：用户询问学院官网上的公开信息（如“学院最近有什么通知”“某位老师是谁”“学院有哪些专业”），且课表/成绩/培养方案/知识库等其他工具不适用时；用户只想知道有哪些内容时，直接用本工具结果汇总回答即可，不必再查详情；若用户需要了解某条结果的详细内容（如某位老师的研究方向、通知的具体安排），请用返回结果中的 url 调用 get_website_detail 获取正文。检索后用自己的话总结提炼回答，不要照搬原文。注意：本工具结果仅供你组织回复，前端不会展示原始数据，请用自然语言汇总，不要输出 JSON。"""
         try:
             data = await gduf_web_adapter.search_website(keyword, page=page)
         except ApiError as exc:
             return _record_failure(ctx, "search_website", exc.message)
         _record_success(ctx, "search_website", data)
+        return data
+
+    @agent.tool
+    async def get_website_detail(
+        ctx: RunContext[AgentDeps],
+        url: Annotated[
+            str,
+            Field(
+                description="要查看正文的官网页面链接：优先传 search_website 返回结果中的 url 字段，不要凭空猜测"
+            ),
+        ],
+    ) -> dict[str, Any]:
+        """获取学院官网某个页面的正文内容（新闻/通知全文、教师个人主页的简介与研究方向、专业详细介绍等，实时来自官网）。调用时机：search_website 返回结果后，用户需要了解某条结果的具体内容时（如“这个老师的研究方向是什么”“这篇通知具体怎么安排”“详细介绍下这个专业”），用对应结果的 url 调用本工具；用户只是浏览标题列表、不需要具体内容时不要调用。调用后用自己的话提炼正文要点回答，不要照搬原文。注意：本工具结果仅供你组织回复，前端不会展示原始数据，请用自然语言总结，不要输出 JSON。"""
+        try:
+            data = await gduf_web_adapter.get_website_detail(url)
+        except ApiError as exc:
+            return _record_failure(ctx, "get_website_detail", exc.message)
+        _record_success(ctx, "get_website_detail", data)
         return data
 
     @agent.tool

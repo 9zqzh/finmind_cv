@@ -12,6 +12,7 @@ from gduf_web_api.models import (
     CompetitionDetail,
     CompetitionSummary,
     CompetitionTimelineItem,
+    ContentDetail,
     ListResult,
     Notice,
     PageResult,
@@ -118,6 +119,74 @@ async def test_search_website_translates_network_error(monkeypatch) -> None:
     with pytest.raises(ApiError) as excinfo:
         await gduf_adapter.search_website("任意")
     assert excinfo.value.code == UPSTREAM_ERROR
+
+
+# ---- get_website_detail：正文整形与调用 ----
+
+
+def _content_detail(text: str = "老师的研究方向是机器学习") -> ContentDetail:
+    return ContentDetail(
+        title="张老师个人主页",
+        url="https://ai.gduf.edu.cn/js/zhang",
+        content_text=text,
+        content_html=f"<p>{text}</p>",
+        images=(),
+        attachments=(),
+        published_at=None,
+        attribution=None,
+        view_count=None,
+        previous_url=None,
+        next_url=None,
+        category="师资队伍",
+        kind="person",
+        source="ai",
+    )
+
+
+def test_shape_content_detail_keeps_core_fields() -> None:
+    data = gduf_adapter.shape_content_detail(_content_detail())
+    assert data["title"] == "张老师个人主页"
+    assert data["category"] == "师资队伍"
+    assert data["content"] == "老师的研究方向是机器学习"
+    assert data["attachments"] == []
+
+
+def test_shape_content_detail_truncates_long_content() -> None:
+    long_text = "详细" * (gduf_adapter.DETAIL_CONTENT_LIMIT + 100)
+    data = gduf_adapter.shape_content_detail(_content_detail(long_text))
+    assert len(data["content"]) == gduf_adapter.DETAIL_CONTENT_LIMIT
+
+
+@pytest.mark.asyncio
+async def test_get_website_detail_forwards_url(monkeypatch) -> None:
+    captured: dict = {}
+
+    def fake_get_detail(item_or_url, *, client=None):
+        captured.update(url=item_or_url, client=client)
+        return _content_detail()
+
+    monkeypatch.setattr(gduf_adapter, "get_ai_detail", fake_get_detail)
+    monkeypatch.setattr(gduf_adapter, "get_client", lambda: object())
+
+    data = await gduf_adapter.get_website_detail("https://ai.gduf.edu.cn/js/zhang")
+    assert captured["url"] == "https://ai.gduf.edu.cn/js/zhang"
+    assert data["title"] == "张老师个人主页"
+    assert "机器学习" in data["content"]
+
+
+@pytest.mark.asyncio
+async def test_get_website_detail_translates_error(monkeypatch) -> None:
+    def fake_get_detail(item_or_url, *, client=None):
+        raise ParseError("页面结构不匹配")
+
+    monkeypatch.setattr(gduf_adapter, "get_ai_detail", fake_get_detail)
+    monkeypatch.setattr(gduf_adapter, "get_client", lambda: object())
+
+    from app.schemas.common import ApiError
+
+    with pytest.raises(ApiError) as excinfo:
+        await gduf_adapter.get_website_detail("https://ai.gduf.edu.cn/js/zhang")
+    assert excinfo.value.code == PARSE_ERROR
 
 
 # ---- 竞赛平台（aijspt）：整形与裁剪 ----

@@ -24,6 +24,7 @@ from gduf_web_api import (
     get_aijspt_bsxq,
     get_aijspt_stlb,
     get_aijspt_tzgg,
+    get_ai_detail,
     search_ai,
 )
 
@@ -44,6 +45,9 @@ COMPETITION_MAX_ITEMS = 10
 
 # 比赛摘要与通知正文的截断长度，避免长文本挤占上下文
 SUMMARY_LIMIT = 200
+
+# 官网页面详情正文的截断长度（详情是用户主动要求查看的内容，比摘要保留更多）
+DETAIL_CONTENT_LIMIT = 1500
 
 # 官网公开内容无需鉴权，进程内复用同一客户端以减少建连开销
 _client: GdufClient | None = None
@@ -121,6 +125,26 @@ async def search_website(keyword: str, page: int = 1) -> dict[str, Any]:
     client = get_client()
     page_result = await run_gduf(lambda: search_ai(keyword, page, client=client))
     return shape_search_result(keyword, page_result)
+
+
+def shape_content_detail(detail) -> dict[str, Any]:
+    """把 ContentDetail 精简为供模型总结的紧凑结构（正文按需截断）。"""
+    content = (detail.content_text or "").strip()
+    return {
+        "title": detail.title,
+        "url": detail.url,
+        "published_at": detail.published_at.isoformat() if detail.published_at else None,
+        "category": detail.category,
+        "content": content[:DETAIL_CONTENT_LIMIT],
+        "attachments": list(detail.attachments),
+    }
+
+
+async def get_website_detail(url: str) -> dict[str, Any]:
+    """获取学院官网某个页面的正文内容（新闻/通知全文、教师个人主页、专业介绍等）。"""
+    client = get_client()
+    detail = await run_gduf(lambda: get_ai_detail(url, client=client))
+    return shape_content_detail(detail)
 
 
 # ---- 竞赛平台（aijspt）业务方法 ----

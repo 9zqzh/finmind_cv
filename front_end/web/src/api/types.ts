@@ -37,6 +37,7 @@ export interface ChatData {
   result_type: string;
   data: unknown;
   sources: string[];
+  conversation_id?: string | null;
 }
 
 export interface ScheduleEntry {

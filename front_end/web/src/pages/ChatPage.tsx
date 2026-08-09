@@ -340,7 +340,7 @@ export default function ChatPage() {
 
           {messages.length === 0 && (
             <Card style={{ textAlign: "center", marginTop: 40 }}>
-              <Typography.Title level={4}>👋 你好，我是学院教学小助手</Typography.Title>
+              <Typography.Title level={4}>👋 你好，我是数智金院 FinMind</Typography.Title>
               <Typography.Paragraph type="secondary">
                 可以问我课表、成绩、培养方案、学院制度、竞赛信息等任何问题
               </Typography.Paragraph>
@@ -446,7 +446,7 @@ export default function ChatPage() {
                     </ReactMarkdown>
                   </div>
                 ) : loading && !msg.thinkingContent ? (
-                  <Spin indicator={<LoadingOutlined />} tip="小助手正在思考..." />
+                  <Spin indicator={<LoadingOutlined />} tip="FinMind 正在思考..." />
                 ) : null}
               </div>
               {msg.chat && (

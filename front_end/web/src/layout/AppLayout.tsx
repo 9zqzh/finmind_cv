@@ -52,7 +52,7 @@ export default function AppLayout() {
         <Space size={12}>
           <img
             src={logo}
-            alt="学院教学小助手 Logo"
+            alt="数智金院 FinMind Logo"
             style={{
               width: 50,
               height: 50,
@@ -61,8 +61,21 @@ export default function AppLayout() {
               transform: "translateY(12px)",
             }}
           />
-          <Typography.Title level={4} style={{ color: "#101828", margin: 0 }}>
-            学院教学小助手
+          <Typography.Title
+            level={4}
+            style={{
+              color: "transparent",
+              margin: 0,
+              background:
+                "linear-gradient(120deg, #1e3a8a 0%, #3f5be0 35%, #5b6ee8 70%, #2a7fe0 100%)",
+              WebkitBackgroundClip: "text",
+              backgroundClip: "text",
+              fontWeight: 700,
+              letterSpacing: 2,
+              filter: "drop-shadow(0 2px 6px rgba(79, 70, 229, 0.25))",
+            }}
+          >
+            数智金院 FinMind
           </Typography.Title>
         </Space>
         <Space>

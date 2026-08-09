@@ -89,11 +89,25 @@ export default function LoginPage() {
         <div style={{ textAlign: "center" }}>
           <img
             src={logo}
-            alt="学院教学小助手 Logo"
+            alt="数智金院 FinMind Logo"
             style={{ width: 64, height: 64, objectFit: "contain", borderRadius: 16 }}
           />
-          <Typography.Title level={3} style={{ marginTop: 12, marginBottom: 4 }}>
-            学院教学小助手
+          <Typography.Title
+            level={3}
+            style={{
+              marginTop: 12,
+              marginBottom: 4,
+              background:
+                "linear-gradient(120deg, #1e3a8a 0%, #3f5be0 35%, #5b6ee8 70%, #2a7fe0 100%)",
+              WebkitBackgroundClip: "text",
+              backgroundClip: "text",
+              color: "transparent",
+              fontWeight: 700,
+              letterSpacing: 2,
+              filter: "drop-shadow(0 2px 6px rgba(79, 70, 229, 0.3))",
+            }}
+          >
+            数智金院 FinMind
           </Typography.Title>
         </div>
         <Typography.Paragraph type="secondary" style={{ textAlign: "center" }}>

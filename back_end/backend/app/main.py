@@ -43,7 +43,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="学院教学小助手 Backend",
+    title="数智金院 FinMind Backend",
     description="PydanticAI Agent + 教务接口 + 轻量知识库",
     version="0.1.0",
     lifespan=lifespan,

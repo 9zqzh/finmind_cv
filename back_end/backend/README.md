@@ -21,7 +21,7 @@ backend/
       tools.py              # 7 个 Agent 工具 + AgentDeps 依赖注入
       orchestrator.py       # Agent 构建与 run_chat 编排
     knowledge/
-      service.py            # 文档加载/切片/关键词检索（后续可换向量检索）
+      service.py            # 文档加载/切片与统一检索门面（Chroma 向量/关键词兜底）
   data/
     knowledge/              # 知识库资料（.md/.txt/.json，示例数据待替换）
     information/            # 学院网站/竞赛资讯（示例数据待替换）
@@ -41,7 +41,7 @@ python -m venv .venv                       # 已创建可跳过
 
 ## 配置
 
-复制 `.env.example` 为 `.env` 并填写 `DEEPSEEK_API_KEY`。所有可调参数（模型名、教务地址、会话时长等）均可通过环境变量覆盖。
+复制 `.env.example` 为 `.env` 并填写 `DEEPSEEK_API_KEY`。未配置嵌入服务时知识库自动使用关键词检索；启用 Docker Chroma 与百炼嵌入的步骤见[团队本地运行与向量检索指南](../../docs/团队本地运行与向量检索指南.md)。所有可调参数均可通过环境变量覆盖。
 
 ## 运行
 

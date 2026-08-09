@@ -76,6 +76,8 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-v4-flash
 ```
 
+知识库默认支持两种模式：不配置嵌入服务时使用关键词检索；配置 Chroma 和百炼嵌入服务后自动使用向量检索。团队成员请优先阅读[团队本地运行与向量检索指南](docs/团队本地运行与向量检索指南.md)。
+
 启动服务：
 
 ```powershell
@@ -159,7 +161,7 @@ X-Session-Token: <session_token>
 ## 数据与安全说明
 
 - 后端为每位用户创建独立的 `JwxtClient`，以隔离 Cookie、登录状态和成绩查询上下文；会话仅保存在服务进程内存中，服务重启后会失效。
-- 登录用户支持多轮对话记忆（滑动窗口最近 6 轮），记忆随会话过期自动清理。
+- 登录和未登录用户都支持最近 4 组问答的临时上下文记忆；刷新页面、服务重启或会话超时后自动清理。
 - 验证码与教务系统的 `JSESSIONID` 绑定，获取验证码与登录必须使用同一会话。
 - 项目不会持久化学号和密码；前端仅将会话令牌保存在浏览器 `sessionStorage`。
 - Agent 通过 14 个工具获取真实数据（教务查询、官网搜索、竞赛讯息、学术资源搜索、知识库检索等），避免直接编造；未登录时会返回相应提示。
@@ -188,7 +190,7 @@ npm run build
 ## 资料维护与当前限制
 
 - `back_end/backend/data/knowledge/` 存放制度、培养方案等 Markdown 资料；`data/information/` 存放学院资讯和竞赛信息。项目根目录 `resources/` 存放原始 PDF/docx 资料文件，可通过 API 浏览目录树与下载/预览。
-- 当前检索属于零额外依赖的关键词检索，不是向量数据库；资料需人工更新。
+- 知识库支持 Chroma 向量检索与关键词兜底；未配置 Docker 或嵌入密钥时仍可正常使用关键词检索。资料仍需人工更新。
 - 学院资讯目前为本地静态示例数据；学院官网公开内容已通过 `gduf-web-api` 实现实时搜索（`search_website` 工具）；竞赛平台公开信息已通过 `gduf-web-api` 实时接入（`query_competitions`/`query_competition_detail`/`query_competition_notices`/`query_competition_clubs` 工具）。
 - 教务解析依赖学校旧版 JSP 页面的结构；若页面改版，`gduf-jwxt-api` 的解析器需要同步维护。
 - AI 对话必须成功配置并能访问模型服务；教务功能还受学校系统可用性影响。
@@ -203,3 +205,4 @@ npm run build
 - [技术栈说明](docs/技术栈说明.md)
 - [项目结构说明](docs/项目结构说明.md)
 - [后端后续开发操作指南](docs/后端后续开发操作指南.md)
+- [团队本地运行与向量检索指南](docs/团队本地运行与向量检索指南.md)

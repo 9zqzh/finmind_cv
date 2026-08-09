@@ -38,5 +38,5 @@ class ChatResponse(BaseModel):
     sources: list[str] = Field(default_factory=list, description="知识来源")
     conversation_id: str | None = Field(
         default=None,
-        description="会话标识（登录用户才有），多轮记忆随此会话生效；后期持久化落地时可扩展为独立对话 ID",
+        description="页面级临时对话标识；携带 X-Conversation-Id 时用于保持当前页面的多轮上下文",
     )

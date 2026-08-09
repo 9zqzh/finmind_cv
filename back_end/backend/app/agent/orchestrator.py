@@ -126,7 +126,7 @@ async def run_chat(
         result_type=result_type,
         data=data,
         sources=sources,
-        conversation_id=session.token if session else None,
+        conversation_id=memory.conversation_id if memory else None,
     )
 
 
@@ -226,6 +226,7 @@ async def run_chat_stream(
                         result_type=final_result_type,
                         data=data,
                         sources=sources,
+                        conversation_id=memory.conversation_id if memory else None,
                     )
                     yield {"type": "done", "chat": response.model_dump()}
     except AgentRunError as exc:

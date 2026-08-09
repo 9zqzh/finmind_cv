@@ -20,21 +20,22 @@ import {
 } from "@ant-design/icons";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { ApiBizError, getToken } from "../api/client";
+import { getToken } from "../api/client";
 import type { ChatData } from "../api/types";
-
-interface ChatMessage {
-  role: "user" | "assistant";
-  text: string;
-  chat?: ChatData;
-  thinkingContent?: string;
-  toolCalls?: ToolCallStep[];
-}
-
-interface ToolCallStep {
-  tool_name: string;
-  status: "calling" | "done";
-}
+import {
+  applyStreamSnapshot,
+  collapseThinking,
+  completeAssistantMessage,
+  createAssistantMessage,
+  createMessageId,
+  createUserMessage,
+  failAssistantMessage,
+  parseSSEChunk,
+  toggleThinking,
+  type ChatMessage,
+  type SSEEvent,
+  type ToolCallStep,
+} from "./chatStream";
 
 /** 根据 result_type 推荐相关问题 */
 const QUICK_QUESTIONS = [
@@ -157,33 +158,24 @@ function ResultCard({ chat }: { chat: ChatData }) {
   }
 }
 
-/** 解析 SSE 行 */
-function parseSSELine(line: string, currentEvent: string): { event: string; data: string } | null {
-  if (line.startsWith("event: ")) {
-    return { event: line.slice(7).trim(), data: "" };
-  }
-  if (line.startsWith("data: ")) {
-    return { event: currentEvent, data: line.slice(6) };
-  }
-  return null;
-}
-
 export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [expandedThinking, setExpandedThinking] = useState<Set<number>>(new Set());
   const listRef = useRef<HTMLDivElement>(null);
-  const streamRef = useRef({ assistantIdx: 0, hasText: false });
   const conversationIdRef = useRef(crypto.randomUUID());
 
-  const toggleThinking = (idx: number) => {
-    setExpandedThinking((prev) => {
-      const next = new Set(prev);
-      if (next.has(idx)) next.delete(idx);
-      else next.add(idx);
-      return next;
-    });
+  const updateAssistant = (
+    assistantId: string,
+    update: (message: ChatMessage) => ChatMessage,
+  ) => {
+    setMessages((prev) =>
+      prev.map((message) => (message.id === assistantId ? update(message) : message)),
+    );
+  };
+
+  const handleThinkingToggle = (assistantId: string) => {
+    updateAssistant(assistantId, toggleThinking);
   };
 
   const scrollToBottom = () => {
@@ -194,27 +186,21 @@ export default function ChatPage() {
 
   const ask = async (question: string) => {
     if (!question.trim() || loading) return;
-    setMessages((prev) => [...prev, { role: "user", text: question }]);
-    setInput("");
-
-    // 占位消息
+    const assistantId = createMessageId();
+    const userMessage = createUserMessage(createMessageId(), question);
     setMessages((prev) => [
       ...prev,
-      {
-        role: "assistant",
-        text: "",
-        thinkingContent: "",
-        toolCalls: [],
-      },
+      userMessage,
+      createAssistantMessage(assistantId),
     ]);
+    setInput("");
     setLoading(true);
     scrollToBottom();
-    streamRef.current.assistantIdx = messages.length + 1;
 
     let accumulatedText = "";
     let accumulatedThinking = "";
     const toolCalls: ToolCallStep[] = [];
-    let hasReceivedText = false;
+    let thinkingExpanded = false;
     let finalChat: ChatData | null = null;
     let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -223,19 +209,14 @@ export default function ChatPage() {
         clearTimeout(flushTimer);
         flushTimer = null;
       }
-      setMessages((prev) => {
-        const updated = [...prev];
-        const last = updated[updated.length - 1];
-        if (last && last.role === "assistant") {
-          updated[updated.length - 1] = {
-            ...last,
-            text: accumulatedText,
-            thinkingContent: accumulatedThinking,
-            toolCalls: [...toolCalls],
-          };
-        }
-        return updated;
-      });
+      updateAssistant(assistantId, (message) =>
+        applyStreamSnapshot(message, {
+          text: accumulatedText,
+          thinkingContent: accumulatedThinking,
+          thinkingExpanded,
+          toolCalls,
+        }),
+      );
       scrollToBottom();
     };
 
@@ -265,131 +246,87 @@ export default function ChatPage() {
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let buffer = "";
-      let currentEvent = "";
+      let parserState = { buffer: "", currentEvent: "" };
+
+      const handleEvents = (events: SSEEvent[]) => {
+        for (const { event, data } of events) {
+          switch (event) {
+            case "thinking": {
+              accumulatedThinking += JSON.parse(data);
+              thinkingExpanded = true;
+              scheduleFlush();
+              break;
+            }
+            case "tool_call": {
+              const info = JSON.parse(data);
+              toolCalls.push({ tool_name: info.tool_name, status: "calling" });
+              flush();
+              break;
+            }
+            case "tool_result": {
+              const info = JSON.parse(data);
+              const index = toolCalls.findIndex(
+                (step) => step.tool_name === info.tool_name && step.status === "calling",
+              );
+              if (index !== -1) {
+                toolCalls[index] = { ...toolCalls[index], status: "done" };
+                flush();
+              }
+              break;
+            }
+            case "text": {
+              accumulatedText += JSON.parse(data);
+              thinkingExpanded = false;
+              scheduleFlush();
+              break;
+            }
+            case "done": {
+              if (flushTimer) {
+                clearTimeout(flushTimer);
+                flushTimer = null;
+              }
+              finalChat = JSON.parse(data) as ChatData;
+              thinkingExpanded = false;
+              break;
+            }
+            case "error":
+              throw new Error(JSON.parse(data));
+          }
+        }
+      };
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed === "") continue;
-          const parsed = parseSSELine(trimmed, currentEvent);
-          if (!parsed) continue;
-
-          if (parsed.event) {
-            currentEvent = parsed.event;
-          }
-          if (parsed.data) {
-            const dataStr = parsed.data;
-            switch (currentEvent) {
-              case "thinking": {
-                const chunk = JSON.parse(dataStr);
-                accumulatedThinking += chunk;
-                // 思考过程中展开思考气泡
-                setExpandedThinking((prev) => {
-                  const next = new Set(prev);
-                  next.add(streamRef.current.assistantIdx);
-                  return next;
-                });
-                scheduleFlush();
-                break;
-              }
-              case "tool_call": {
-                const info = JSON.parse(dataStr);
-                toolCalls.push({ tool_name: info.tool_name, status: "calling" });
-                flush();
-                break;
-              }
-              case "tool_result": {
-                const info = JSON.parse(dataStr);
-                const idx = toolCalls.findIndex(
-                  (s) => s.tool_name === info.tool_name && s.status === "calling",
-                );
-                if (idx !== -1) {
-                  toolCalls[idx] = { ...toolCalls[idx], status: "done" };
-                  flush();
-                }
-                break;
-              }
-              case "text": {
-                const chunk = JSON.parse(dataStr);
-                if (!hasReceivedText) {
-                  hasReceivedText = true;
-                  // 开始输出正文时折叠思考气泡
-                  setExpandedThinking((prev) => {
-                    const next = new Set(prev);
-                    next.delete(streamRef.current.assistantIdx);
-                    return next;
-                  });
-                }
-                accumulatedText += chunk;
-                scheduleFlush();
-                break;
-              }
-              case "done": {
-                if (flushTimer) {
-                  clearTimeout(flushTimer);
-                  flushTimer = null;
-                }
-                const payload = JSON.parse(dataStr);
-                finalChat = payload as ChatData;
-                break;
-              }
-              case "error": {
-                const msg = JSON.parse(dataStr);
-                throw new Error(msg);
-              }
-            }
-          }
-        }
+        const parsed = parseSSEChunk(parserState, decoder.decode(value, { stream: true }));
+        parserState = parsed.state;
+        handleEvents(parsed.events);
       }
 
-      // 最终刷新
+      const finalChunk = parseSSEChunk(parserState, `${decoder.decode()}\n`);
+      handleEvents(finalChunk.events);
+
       if (flushTimer) {
         clearTimeout(flushTimer);
         flushTimer = null;
       }
 
       if (finalChat) {
-        setMessages((prev) => {
-          const updated = [...prev];
-          const last = updated[updated.length - 1];
-          if (last && last.role === "assistant") {
-            updated[updated.length - 1] = {
-              role: "assistant",
-              text: finalChat!.answer,
-              chat: finalChat!,
-              thinkingContent: accumulatedThinking,
-              toolCalls: [...toolCalls],
-            };
-          }
-          return updated;
-        });
+        updateAssistant(assistantId, (message) =>
+          completeAssistantMessage(message, finalChat!, accumulatedThinking, toolCalls),
+        );
       } else {
+        thinkingExpanded = false;
         flush();
       }
     } catch (error) {
-      const msg = error instanceof ApiBizError ? error.message : "对话请求失败";
-      setMessages((prev) => {
-        const updated = [...prev];
-        const last = updated[updated.length - 1];
-        if (last && last.role === "assistant") {
-          updated[updated.length - 1] = {
-            ...last,
-            text: `⚠️ ${msg}`,
-            thinkingContent: accumulatedThinking,
-            toolCalls: [...toolCalls],
-          };
-        }
-        return updated;
-      });
+      const msg = error instanceof Error ? error.message : "对话请求失败";
+      updateAssistant(assistantId, (message) =>
+        failAssistantMessage(message, msg, accumulatedThinking, toolCalls),
+      );
     } finally {
+      updateAssistant(assistantId, collapseThinking);
       setLoading(false);
       scrollToBottom();
     }
@@ -416,9 +353,9 @@ export default function ChatPage() {
               </Space>
             </Card>
           )}
-          {messages.map((msg, i) => (
+          {messages.map((msg) => (
             <div
-              key={i}
+              key={msg.id}
               style={{
                 display: "flex",
                 gap: 12,
@@ -446,7 +383,7 @@ export default function ChatPage() {
                   }}
                 >
                   <div
-                    onClick={() => toggleThinking(i)}
+                    onClick={() => handleThinkingToggle(msg.id)}
                     style={{
                       padding: "8px 14px",
                       cursor: "pointer",
@@ -460,14 +397,14 @@ export default function ChatPage() {
                       <BulbOutlined style={{ marginRight: 4 }} />
                       AI 思考过程
                       <span style={{ marginLeft: 6, color: "#8c8c8c" }}>
-                        {expandedThinking.has(i) ? "（点击收起）" : "（点击展开）"}
+                        {msg.thinkingExpanded ? "（点击收起）" : "（点击展开）"}
                       </span>
                     </Typography.Text>
-                    <span style={{ fontSize: 12, color: "#8c8c8c", transform: expandedThinking.has(i) ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>
+                    <span style={{ fontSize: 12, color: "#8c8c8c", transform: msg.thinkingExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>
                       ▼
                     </span>
                   </div>
-                  {expandedThinking.has(i) && (
+                  {msg.thinkingExpanded && (
                     <div style={{ padding: "0 14px 10px" }}>
                       <div style={{ whiteSpace: "pre-wrap" }}>{msg.thinkingContent}</div>
                       {msg.toolCalls && msg.toolCalls.length > 0 && (

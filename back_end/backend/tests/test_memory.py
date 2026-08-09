@@ -47,8 +47,8 @@ async def test_guest_and_logged_in_chat_share_the_same_temporary_memory(test_age
         "那明天呢？", _fake_deps(), session=_fake_session(), memory=memory
     )
 
-    assert guest.conversation_id is None
-    assert logged_in.conversation_id == "login-token"
+    assert guest.conversation_id == "page-1"
+    assert logged_in.conversation_id == "page-1"
     assert len(memory.chat_history) == 2
     assert "我今天有什么课？" in _history_text(memory)
     assert "那明天呢？" in _history_text(memory)
@@ -92,6 +92,8 @@ async def test_streaming_chat_saves_a_completed_turn(test_agent):
     ]
 
     assert any(event["type"] == "done" for event in events)
+    done_event = next(event for event in events if event["type"] == "done")
+    assert done_event["chat"]["conversation_id"] == "page-1"
     assert len(memory.chat_history) == 1
     assert "流式问题" in _history_text(memory)
 

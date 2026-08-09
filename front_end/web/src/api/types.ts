@@ -118,6 +118,7 @@ export interface SearchChunk {
   source: string;
   title: string;
   score?: number;
+  resource_path?: string | null;
 }
 
 export interface SearchData {

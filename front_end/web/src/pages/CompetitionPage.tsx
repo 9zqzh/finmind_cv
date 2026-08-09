@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Card, Col, Modal, Row, Tag, Typography, Spin, Space, Empty, Tabs } from "antd";
 import {
   ClockCircleOutlined,
@@ -9,58 +9,19 @@ import {
   CalendarOutlined,
   BellOutlined,
   BulbOutlined,
-
 } from "@ant-design/icons";
-import { api } from "../api/client";
+import {
+  getCompetitionStore,
+  subscribeToCompetitionStore,
+  preloadCompetitionData,
+} from "../stores/competitionStore";
+import type { CompetitionItem, NoticeItem, ClubItem } from "../stores/competitionStore";
 
-const COMPETITION_API = "/api/competitions/list";
-const NOTICES_API = "/api/competitions/notices";
-const CLUBS_API = "/api/competitions/clubs";
+// 类型从 competitionStore 导入
 
-// ---- 类型定义 ----
-interface CompetitionItem {
-  id: string;
-  title: string;
-  url: string;
-  category: string;
-  year: number | null;
-  recognition: string;
-  status: string;
-  department: string;
-  registration_mode: string;
-  max_team_size: number | null;
-  max_advisors: number | null;
-  registration_start_at: string | null;
-  registration_end_at: string | null;
-  event_start_at: string | null;
-  event_end_at: string | null;
-  official_url: string | null;
-  wechat_article_url: string | null;
-  cta_type: string;
-  cta_label: string | null;
-  summary: string;
-}
 
-interface NoticeItem {
-  id: string;
-  title: string;
-  content: string;
-  priority: string;
-  published_at: string;
-  competition_title: string | null;
-  competition_id: string | null;
-}
 
-interface ClubItem {
-  slug: string;
-  name: string;
-  short_name: string;
-  slogan: string;
-  cover_image: string | null;
-  theme_color: string | null;
-  focus_areas: string[];
-  url: string;
-}
+
 
 // ---- 状态映射 ----
 const STATUS_LABELS: Record<string, string> = {
@@ -379,82 +340,18 @@ function ClubCard({ item }: { item: ClubItem }) {
 
 // ---- 主页面 ----
 export default function CompetitionPage() {
-  const [items, setItems] = useState<CompetitionItem[]>([]);
-  const [notices, setNotices] = useState<NoticeItem[]>([]);
-  const [clubs, setClubs] = useState<ClubItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const store = useSyncExternalStore(subscribeToCompetitionStore, getCompetitionStore);
 
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const [compRes, noticeRes, clubRes] = await Promise.all([
-          api.getExternal(COMPETITION_API),
-          api.getExternal(NOTICES_API),
-          api.getExternal(CLUBS_API),
-        ]);
+    if (!store.loaded && !store.loading) {
+      preloadCompetitionData();
+    }
+  }, [store.loaded, store.loading]);
 
-        const mapped: CompetitionItem[] = ((compRes as any).competitions ?? []).map(
-          (item: Record<string, unknown>) => ({
-            id: String(item.id ?? ""),
-            title: String(item.title ?? ""),
-            url: `https://ai-data-competitions.cn/competitions/${item.id}`,
-            category: String(item.category ?? ""),
-            year: (item.competitionYear as number) ?? null,
-            recognition: String(item.recognition ?? ""),
-            status: String(item.status ?? ""),
-            department: String(item.department ?? ""),
-            registration_mode: String(item.registrationMode ?? ""),
-            max_team_size: (item.maxTeamSize as number) ?? null,
-            max_advisors: (item.maxAdvisors as number) ?? null,
-            registration_start_at: (item.registrationStartAt as string) ?? null,
-            registration_end_at: (item.registrationEndAt as string) ?? null,
-            event_start_at: (item.eventStartAt as string) ?? null,
-            event_end_at: (item.eventEndAt as string) ?? null,
-            official_url: (item.officialUrl as string) ?? null,
-            wechat_article_url: (item.wechatArticleUrl as string) ?? null,
-            cta_type: String(item.ctaType ?? ""),
-            cta_label: (item.ctaLabelOverride as string) ?? null,
-            summary: String(item.summary ?? ""),
-          })
-        );
-        setItems(mapped);
-
-        const mappedNotices: NoticeItem[] = ((noticeRes as any).notices ?? []).map(
-          (item: Record<string, unknown>) => ({
-            id: String(item.id ?? ""),
-            title: String(item.title ?? ""),
-            content: String(item.content ?? ""),
-            priority: String(item.priority ?? "normal"),
-            published_at: (item.publishedAt as string) ?? "",
-            competition_title: (item.competitionTitle as string) ?? null,
-            competition_id: (item.competitionId as string) ?? null,
-          })
-        );
-        setNotices(mappedNotices);
-
-        const mappedClubs: ClubItem[] = ((clubRes as any).data ?? []).map(
-          (item: Record<string, unknown>) => ({
-            slug: String(item.slug ?? ""),
-            name: String(item.name ?? ""),
-            short_name: String(item.shortName ?? ""),
-            slogan: String(item.slogan ?? ""),
-            cover_image: (item.coverImage as string) ?? null,
-            theme_color: (item.themeColor as string) ?? null,
-            focus_areas: (item.focusAreas as string[]) ?? [],
-            url: `https://ai-data-competitions.cn/clubs/${item.slug}`,
-          })
-        );
-        setClubs(mappedClubs);
-      } catch {
-        setItems([]);
-        setNotices([]);
-        setClubs([]);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+  const items = store.items as CompetitionItem[];
+  const notices = store.notices as NoticeItem[];
+  const clubs = store.clubs as ClubItem[];
+  const loading = store.loading && !store.loaded;
 
   if (loading) {
     return (

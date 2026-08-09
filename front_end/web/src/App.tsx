@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Spin } from "antd";
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -11,6 +12,8 @@ import ClassroomSchedulePage from "./pages/ClassroomSchedulePage";
 import KnowledgePage from "./pages/KnowledgePage";
 import CompetitionPage from "./pages/CompetitionPage";
 import InformationPage from "./pages/InformationPage";
+import { preloadCompetitionData } from "./stores/competitionStore";
+import { preloadInformationData } from "./stores/informationStore";
 
 function ProtectedLayout() {
   const { loggedIn, loading } = useAuth();
@@ -28,6 +31,8 @@ function ProtectedLayout() {
 }
 
 export default function App() {
+  useEffect(() => { preloadCompetitionData(); preloadInformationData(); }, []);
+
   return (
     <AuthProvider>
       <BrowserRouter>

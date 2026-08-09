@@ -220,6 +220,30 @@ def shape_club_list(list_result) -> dict[str, Any]:
     }
 
 
+def shape_article_summary(item) -> dict[str, Any]:
+    """将 ArticleSummary 转换为可序列化 dict。"""
+    return {
+        "title": item.title or "",
+        "url": item.url or "",
+        "published_at": item.published_at,
+        "summary": (item.summary or "")[:SUMMARY_LIMIT],
+        "image_url": item.image_url,
+        "category": item.category or "",
+    }
+
+
+async def get_homepage_info() -> dict[str, Any]:
+    """获取学院首页资讯（学院新闻、学术活动、学生活动、通知公告）。"""
+    client = get_client()
+    home = await run_gduf(lambda: client.get_home(source="ai"))
+    return {
+        "xyxw": [shape_article_summary(a) for a in home.xyxw],
+        "xshuhd": [shape_article_summary(a) for a in home.xshuhd],
+        "xshenghd": [shape_article_summary(a) for a in home.xshenghd],
+        "tzgg": [shape_article_summary(a) for a in home.tzgg],
+    }
+
+
 async def get_competitions(
     *,
     year: int | None = None,

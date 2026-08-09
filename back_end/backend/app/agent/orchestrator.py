@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+from typing import Any, AsyncGenerator
+
 from pydantic_ai import Agent
 from pydantic_ai.exceptions import AgentRunError
 from pydantic_ai.messages import ModelMessagesTypeAdapter
@@ -17,7 +19,8 @@ from app.config import Settings, get_settings
 from app.knowledge import KnowledgeService
 from app.schemas.chat import ChatResponse, ToolCallInfo
 from app.schemas.common import MODEL_ERROR, ApiError
-from app.services.session import ChatTurn, JwxtSession
+from app.services.conversation import ConversationMemory, ConversationTurn
+from app.services.session import JwxtSession
 
 _AGENT: Agent | None = None
 
@@ -40,8 +43,8 @@ _TEXT_ONLY_RESULT_TYPES = {
     "competition_club",
 }
 
-# 对话记忆滑动窗口：最多保留最近 6 轮（12 条消息），超出丢弃最早轮次
-HISTORY_MAX_TURNS = 6
+# 对话记忆滑动窗口：只保留最近 4 组“用户提问 + AI 回答”。
+HISTORY_MAX_TURNS = 4
 
 
 def _event_result_type(event: dict) -> str:
@@ -78,16 +81,17 @@ async def run_chat(
     message: str,
     deps: AgentDeps,
     session: JwxtSession | None = None,
+    memory: ConversationMemory | None = None,
     settings: Settings | None = None,
 ) -> ChatResponse:
     """执行一轮对话并返回统一结构的 ChatResponse。
 
-    若传入了登录会话，则启用多轮记忆：把会话中的历史轮次作为
-    message_history 传入模型，并把本轮结果存回会话（滑动窗口裁剪）。
+    传入临时对话记忆时，把最近四轮作为 message_history 传入模型，
+    并在本轮成功完成后保存新增消息。
     """
     settings = settings or get_settings()
     agent = get_agent(settings)
-    history = _load_history(session)
+    history = _load_history(memory)
     try:
         result = await agent.run(message, deps=deps, message_history=history or None)
     except AgentRunError as exc:
@@ -96,7 +100,7 @@ async def run_chat(
         raise ApiError(MODEL_ERROR, "模型响应超时，请稍后重试", status_code=504) from exc
 
     answer = str(result.output)
-    _save_turn(session, message, answer, result)
+    _save_turn(memory, result)
 
     tool_calls = [
         ToolCallInfo(
@@ -126,43 +130,32 @@ async def run_chat(
     )
 
 
-def _load_history(session: JwxtSession | None):
-    """从会话恢复历史模型消息；反序列化失败时静默降级为空历史。"""
-    if session is None or not session.chat_history:
+def _load_history(memory: ConversationMemory | None):
+    """恢复最近四轮模型消息；损坏时清空临时记忆并降级为空历史。"""
+    if memory is None or not memory.chat_history:
         return []
     try:
-        return ModelMessagesTypeAdapter.validate_json(
-            session.chat_history[-1].model_messages_json
-        )
+        history = []
+        for turn in memory.chat_history:
+            history.extend(ModelMessagesTypeAdapter.validate_json(turn.model_messages_json))
+        return history
     except Exception:
         # 历史不可用（如 pydantic-ai 升级导致格式不兼容）不影响本轮对话
-        session.chat_history.clear()
+        memory.chat_history.clear()
         return []
 
 
-def _save_turn(
-    session: JwxtSession | None,
-    message: str,
-    answer: str,
-    result,
-) -> None:
-    """把本轮对话存入会话记忆，并裁剪至最近 HISTORY_MAX_TURNS 轮。"""
-    if session is None:
+def _save_turn(memory: ConversationMemory | None, result) -> None:
+    """保存本轮新增模型消息，并裁剪至最近 HISTORY_MAX_TURNS 轮。"""
+    if memory is None:
         return
     try:
-        messages_json = ModelMessagesTypeAdapter.dump_json(result.all_messages())
+        messages_json = ModelMessagesTypeAdapter.dump_json(result.new_messages())
     except Exception:
         return
-    session.chat_history.append(
-        ChatTurn(
-            user_message=message,
-            assistant_message=answer,
-            model_messages_json=messages_json.decode(),
-        )
-    )
-    if len(session.chat_history) > HISTORY_MAX_TURNS:
-        del session.chat_history[:-HISTORY_MAX_TURNS]
-from typing import Any, AsyncGenerator
+    memory.chat_history.append(ConversationTurn(model_messages_json=messages_json.decode()))
+    if len(memory.chat_history) > HISTORY_MAX_TURNS:
+        del memory.chat_history[:-HISTORY_MAX_TURNS]
 
 from pydantic_ai.messages import (
     FunctionToolCallEvent,
@@ -178,6 +171,7 @@ from pydantic_ai.run import AgentRunResultEvent
 async def run_chat_stream(
     message: str,
     deps: AgentDeps,
+    memory: ConversationMemory | None = None,
     settings: Settings | None = None,
 ) -> AsyncGenerator[dict[str, Any], None]:
     """流式执行对话，逐步产出事件 dict。
@@ -192,8 +186,11 @@ async def run_chat_stream(
     """
     settings = settings or get_settings()
     agent = get_agent(settings)
+    history = _load_history(memory)
     try:
-        async with agent.run_stream_events(message, deps=deps) as stream:
+        async with agent.run_stream_events(
+            message, deps=deps, message_history=history or None
+        ) as stream:
             async for ev in stream:
                 if isinstance(ev, PartDeltaEvent) and isinstance(ev.delta, ThinkingPartDelta):
                     yield {"type": "thinking", "content": ev.delta.content_delta}
@@ -205,6 +202,7 @@ async def run_chat_stream(
                     yield {"type": "text", "content": ev.delta.content_delta}
                 elif isinstance(ev, AgentRunResultEvent):
                     # 构建最终结构化响应
+                    _save_turn(memory, ev.result)
                     tool_calls = [
                         ToolCallInfo(
                             tool=evt["tool"],

@@ -5,7 +5,9 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
+from app.api import chat as chat_api
 from app.main import app
+from app.schemas.chat import ChatResponse
 
 
 @pytest.fixture(scope="module")
@@ -26,6 +28,25 @@ def test_auth_status_without_token(client):
     response = client.get("/api/auth/status")
     assert response.status_code == 200
     assert response.json()["data"]["logged_in"] is False
+
+
+def test_chat_uses_temporary_conversation_header(client, monkeypatch):
+    received_memories = []
+
+    async def fake_run_chat(message, deps, session=None, memory=None):
+        received_memories.append(memory)
+        return ChatResponse(answer="ok")
+
+    monkeypatch.setattr(chat_api, "run_chat", fake_run_chat)
+    headers = {"X-Conversation-Id": "browser-page-1"}
+
+    first = client.post("/api/chat", json={"message": "第一轮"}, headers=headers)
+    second = client.post("/api/chat", json={"message": "第二轮"}, headers=headers)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert received_memories[0] is received_memories[1]
+    assert received_memories[0].conversation_id == "browser-page-1"
 
 
 def test_schedule_requires_login(client):

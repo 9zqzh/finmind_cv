@@ -175,6 +175,7 @@ export default function ChatPage() {
   const [expandedThinking, setExpandedThinking] = useState<Set<number>>(new Set());
   const listRef = useRef<HTMLDivElement>(null);
   const streamRef = useRef({ assistantIdx: 0, hasText: false });
+  const conversationIdRef = useRef(crypto.randomUUID());
 
   const toggleThinking = (idx: number) => {
     setExpandedThinking((prev) => {
@@ -252,6 +253,7 @@ export default function ChatPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "X-Conversation-Id": conversationIdRef.current,
           ...(token ? { "X-Session-Token": token } : {}),
         },
         body: JSON.stringify({ message: question }),

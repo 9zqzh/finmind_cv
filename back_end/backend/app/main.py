@@ -19,6 +19,7 @@ from app.config import get_settings
 from app.knowledge import KnowledgeService
 from app.knowledge.factory import build_knowledge_service
 from app.schemas.common import INVALID_PARAM, ApiError, fail, ok
+from app.services.conversation import ConversationManager
 from app.services.session import SessionManager
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -26,9 +27,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """应用启动时初始化会话管理器与知识库。"""
+    """应用启动时初始化会话管理器、临时对话记忆与知识库。"""
     settings = get_settings()
     app.state.sessions = SessionManager(settings)
+    app.state.conversations = ConversationManager(settings)
     app.state.knowledge = build_knowledge_service(
         BASE_DIR / settings.knowledge_dir,
         settings,

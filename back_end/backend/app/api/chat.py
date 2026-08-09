@@ -8,11 +8,13 @@ from app.agent.orchestrator import build_deps, run_chat, run_chat_stream
 from app.api.deps import (
     get_information,
     get_knowledge,
+    get_optional_conversation,
     get_optional_session,
 )
 from app.knowledge import KnowledgeService
 from app.schemas.common import ok
 from app.schemas.requests import ChatRequest
+from app.services.conversation import ConversationMemory
 from app.services.session import JwxtSession
 
 router = APIRouter(prefix="/api", tags=["chat"])
@@ -22,12 +24,15 @@ router = APIRouter(prefix="/api", tags=["chat"])
 async def chat(
     payload: ChatRequest,
     session: JwxtSession | None = Depends(get_optional_session),
+    conversation: ConversationMemory | None = Depends(get_optional_conversation),
     knowledge: KnowledgeService = Depends(get_knowledge),
     information: KnowledgeService = Depends(get_information),
 ):
-    """发送自然语言问题，返回文本回答与可选结构化结果。登录用户自动启用多轮对话记忆。"""
+    """发送自然语言问题，返回文本回答与可选结构化结果。"""
     deps = build_deps(session, knowledge, information)
-    response = await run_chat(payload.message, deps, session=session)
+    response = await run_chat(
+        payload.message, deps, session=session, memory=conversation
+    )
     return ok(response.model_dump())
 
 
@@ -38,6 +43,7 @@ from fastapi.responses import StreamingResponse
 async def chat_stream(
     payload: ChatRequest,
     session: JwxtSession | None = Depends(get_optional_session),
+    conversation: ConversationMemory | None = Depends(get_optional_conversation),
     knowledge: KnowledgeService = Depends(get_knowledge),
     information: KnowledgeService = Depends(get_information),
 ):
@@ -46,7 +52,9 @@ async def chat_stream(
 
     async def event_stream():
         try:
-            async for event in run_chat_stream(payload.message, deps):
+            async for event in run_chat_stream(
+                payload.message, deps, memory=conversation
+            ):
                 ev_type = event["type"]
                 if ev_type == "thinking":
                     yield f"event: thinking\ndata: {json.dumps(event['content'], ensure_ascii=False)}\n\n"

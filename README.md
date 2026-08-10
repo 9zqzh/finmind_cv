@@ -2,8 +2,6 @@
 
 面向广东金融学院学生的教学信息助手。项目将教务系统查询、学院官网公开信息检索、学术资源搜索（arXiv/Semantic Scholar）、学院制度与资料检索，以及基于大模型的自然语言对话整合到一个 Web 应用中：学生既可以通过页面查询课表和成绩，也可以在对话中用自然语言提问，系统自动选择工具并以结构化卡片展示结果。支持多轮对话记忆与流式输出。
 
-> 这是一个学习/原型项目，并非学校官方系统或 SDK。涉及个人数据的查询依赖真实教务系统，使用时请遵守学校的信息系统使用规范。
-
 ## 功能概览
 
 - **教务登录**：获取验证码、使用学号和密码登录、查询登录状态与退出登录。
@@ -192,7 +190,6 @@ npm run build
 - `back_end/backend/data/knowledge/` 存放制度、培养方案等 Markdown 资料；`data/information/` 存放学院资讯和竞赛信息。项目根目录 `resources/` 存放原始 PDF/docx 资料文件，可通过 API 浏览目录树与下载/预览。
 - 知识库支持 Chroma 向量检索与关键词兜底；未配置 Docker 或嵌入密钥时仍可正常使用关键词检索。资料仍需人工更新。
 - 学院资讯目前为本地静态示例数据；学院官网公开内容已通过 `gduf-web-api` 实现实时搜索（`search_website` 工具）；竞赛平台公开信息已通过 `gduf-web-api` 实时接入（`query_competitions`/`query_competition_detail`/`query_competition_notices`/`query_competition_clubs` 工具）。
-- 教务解析依赖学校旧版 JSP 页面的结构；若页面改版，`gduf-jwxt-api` 的解析器需要同步维护。
 - AI 对话必须成功配置并能访问模型服务；教务功能还受学校系统可用性影响。
 
 ## 进一步阅读

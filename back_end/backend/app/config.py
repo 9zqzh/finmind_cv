@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -24,6 +25,11 @@ class Settings(BaseSettings):
         default="https://api.deepseek.com", alias="DEEPSEEK_BASE_URL"
     )
     deepseek_model: str = Field(default="deepseek-v4-flash", alias="DEEPSEEK_MODEL")
+    deepseek_extra_body: dict[str, Any] = Field(
+        default_factory=dict,
+        alias="DEEPSEEK_EXTRA_BODY",
+        description="合并到模型请求体的 OpenAI 兼容服务商自定义参数",
+    )
 
     # Knowledge retrieval
     knowledge_retrieval_mode: str = Field(

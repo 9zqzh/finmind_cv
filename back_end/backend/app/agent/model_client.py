@@ -5,13 +5,15 @@
 
 from __future__ import annotations
 
+import json
+
 from openai import AsyncOpenAI
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
 from app.config import Settings, get_settings
 
-_MODEL_CACHE: dict[tuple[str, str], OpenAIChatModel] = {}
+_MODEL_CACHE: dict[tuple[str, str, str], OpenAIChatModel] = {}
 
 
 def build_model(settings: Settings | None = None) -> OpenAIChatModel:
@@ -21,7 +23,17 @@ def build_model(settings: Settings | None = None) -> OpenAIChatModel:
         raise RuntimeError(
             "未配置 DEEPSEEK_API_KEY，请复制 .env.example 为 .env 并填写密钥"
         )
-    cache_key = (settings.deepseek_base_url, settings.deepseek_model)
+    extra_body_key = json.dumps(
+        settings.deepseek_extra_body,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    cache_key = (
+        settings.deepseek_base_url,
+        settings.deepseek_model,
+        extra_body_key,
+    )
     if cache_key not in _MODEL_CACHE:
         client = AsyncOpenAI(
             base_url=settings.deepseek_base_url,
@@ -31,5 +43,10 @@ def build_model(settings: Settings | None = None) -> OpenAIChatModel:
         _MODEL_CACHE[cache_key] = OpenAIChatModel(
             settings.deepseek_model,
             provider=OpenAIProvider(openai_client=client),
+            settings=(
+                {"extra_body": settings.deepseek_extra_body}
+                if settings.deepseek_extra_body
+                else None
+            ),
         )
     return _MODEL_CACHE[cache_key]

@@ -23,3 +23,17 @@ def test_embedding_key_file_is_used_without_exposing_key(tmp_path):
 
     assert settings.embedding_configured is True
     assert settings.embedding_api_key_value == "unit-test-embedding-key-1234567890"
+
+
+def test_model_extra_body_is_loaded_from_json_env(monkeypatch):
+    monkeypatch.setenv(
+        "DEEPSEEK_EXTRA_BODY",
+        '{"thinking":{"type":"enabled"},"reasoning_effort":"max"}',
+    )
+
+    settings = Settings(_env_file=None)
+
+    assert settings.deepseek_extra_body == {
+        "thinking": {"type": "enabled"},
+        "reasoning_effort": "max",
+    }

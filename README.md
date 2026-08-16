@@ -111,6 +111,7 @@ npm run dev
 | `DEEPSEEK_API_KEY` | 空 | DeepSeek 密钥；未配置时 AI 对话不可用 |
 | `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | OpenAI 兼容接口地址 |
 | `DEEPSEEK_MODEL` | `deepseek-v4-flash` | 对话模型名称 |
+| `DEEPSEEK_EXTRA_BODY` | `{}` | 合并到模型请求体的额外 JSON 参数，如思考模式与强度 |
 | `AGENT_MAX_ITERATIONS` | `4` | Agent 最大工具调用轮次（当前作为配置保留） |
 | `AGENT_TIMEOUT_SECONDS` | `30` | Agent 超时配置（当前由模型客户端请求超时控制） |
 | `JWXT_BASE_URL` | `https://jwxt.gduf.edu.cn` | 教务系统根地址 |

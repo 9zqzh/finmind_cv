@@ -23,7 +23,7 @@ def _build_test_agent() -> Agent:
 def test_all_tools_registered():
     agent = _build_test_agent()
     names = set(RESULT_TYPES.keys())
-    assert len(names) == 15
+    assert len(names) == 17
     # 通过 agent 的 toolset 检查已注册工具名
     registered: set[str] = set()
     for toolset in getattr(agent, "_user_toolsets", []):
@@ -36,6 +36,7 @@ def test_all_tools_registered():
 def test_run_with_test_model(tmp_path, monkeypatch):
     # TestModel 会随机选择工具调用，把外部适配层替换为桩避免真实网络请求
     from app.adapters import academic as academic_adapter
+    from app.adapters import amap as amap_adapter
     from app.adapters import gduf_web as gduf_web_adapter
     from app.adapters import jwxt as jwxt_adapter
 
@@ -48,6 +49,9 @@ def test_run_with_test_model(tmp_path, monkeypatch):
     for name in dir(academic_adapter):
         if name.startswith(("search_", "get_")):
             monkeypatch.setattr(academic_adapter, name, _fake_ok)
+    for name in dir(amap_adapter):
+        if name.startswith(("search_", "query_")):
+            monkeypatch.setattr(amap_adapter, name, _fake_ok)
 
     async def _fake_auth_required(*args, **kwargs):
         from app.schemas.common import AUTH_REQUIRED, ApiError
@@ -112,3 +116,95 @@ def test_search_knowledge_returns_score_and_resource_path(tmp_path):
     assert result["results"][0]["score"] > 0
     assert result["results"][0]["resource_path"] == "办事流程/重修流程.pdf"
     assert deps.sources == ["办事流程/重修流程.pdf"]
+
+
+def test_map_tools_registered_with_result_types():
+    """地图工具注册到 RESULT_TYPES，且不被降级为纯文本（需渲染卡片）。"""
+    assert RESULT_TYPES["search_map_places"] == "map_places"
+    assert RESULT_TYPES["query_map_route"] == "map_route"
+    from app.agent.orchestrator import _TEXT_ONLY_RESULT_TYPES
+
+    assert "map_places" not in _TEXT_ONLY_RESULT_TYPES
+    assert "map_route" not in _TEXT_ONLY_RESULT_TYPES
+
+
+def test_search_map_places_tool_records_success(monkeypatch):
+    from app.adapters import amap as amap_adapter
+
+    async def fake_search(keywords, location=None, radius=None, city=None):
+        return {
+            "query": keywords,
+            "total": 1,
+            "places": [
+                {
+                    "name": "清远烧鹅饭店",
+                    "location": "113.06,23.69",
+                    "rating": 4.5,
+                    "cost": 45,
+                    "distance": 800,
+                    "comment_num": 0,
+                }
+            ],
+        }
+
+    monkeypatch.setattr(amap_adapter, "search_map_places", fake_search)
+    agent = _build_test_agent()
+    tool = agent._function_toolset.tools["search_map_places"]
+    deps = AgentDeps()
+
+    result = asyncio.run(
+        tool.function(SimpleNamespace(deps=deps), keywords="烧鹅", radius=3000)
+    )
+
+    assert result["places"][0]["name"] == "清远烧鹅饭店"
+    assert deps.last_result_type == "map_places"
+    assert deps.tool_events[-1]["ok"] is True
+
+
+def test_query_map_route_tool_records_success(monkeypatch):
+    from app.adapters import amap as amap_adapter
+
+    async def fake_route(destination, mode="walking", origin=None):
+        return {
+            "origin": "广东金融学院清远校区",
+            "destination": destination,
+            "mode": mode,
+            "distance_m": 1500,
+            "duration_s": 1200,
+            "distance_text": "1.5 公里",
+            "duration_text": "20 分钟",
+            "steps": ["从起点出发"],
+            "navigation_url": "https://uri.amap.com/navigation",
+        }
+
+    monkeypatch.setattr(amap_adapter, "query_map_route", fake_route)
+    agent = _build_test_agent()
+    tool = agent._function_toolset.tools["query_map_route"]
+    deps = AgentDeps()
+
+    result = asyncio.run(
+        tool.function(SimpleNamespace(deps=deps), destination="万达广场", mode="bicycling")
+    )
+
+    assert result["mode"] == "bicycling"
+    assert result["distance_text"] == "1.5 公里"
+    assert deps.last_result_type == "map_route"
+
+
+def test_map_tools_report_failure_without_error(monkeypatch):
+    """上游异常时工具返回 error 结构而不是抛出。"""
+    from app.adapters import amap as amap_adapter
+    from app.schemas.common import UPSTREAM_ERROR, ApiError
+
+    async def fake_search(keywords, location=None, radius=None, city=None):
+        raise ApiError(UPSTREAM_ERROR, "高德地图接口返回错误", status_code=502)
+
+    monkeypatch.setattr(amap_adapter, "search_map_places", fake_search)
+    agent = _build_test_agent()
+    tool = agent._function_toolset.tools["search_map_places"]
+    deps = AgentDeps()
+
+    result = asyncio.run(tool.function(SimpleNamespace(deps=deps), keywords="烧鹅"))
+
+    assert "error" in result
+    assert deps.tool_events[-1]["ok"] is False

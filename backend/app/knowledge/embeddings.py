@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Sequence
 from typing import Protocol
 
@@ -32,12 +33,18 @@ class OpenAICompatibleEmbeddingProvider:
         model: str,
         timeout_seconds: float = 30.0,
         batch_size: int = 10,
+        retries: int = 2,
+        transport: httpx.BaseTransport | None = None,
     ) -> None:
         self.endpoint = self._endpoint(base_url)
         self.api_key = api_key
         self.model = model
         self.timeout_seconds = timeout_seconds
         self.batch_size = max(batch_size, 1)
+        # 网络抖动/服务端 5xx 时的重试次数（指数退避，初退 1s 递增）
+        self.retries = max(retries, 0)
+        # 测试注入用：默认为 None 走真实网络
+        self.transport = transport
 
     def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
         if not texts:
@@ -54,13 +61,31 @@ class OpenAICompatibleEmbeddingProvider:
         return vectors[0]
 
     def _request(self, inputs: list[str]) -> list[list[float]]:
+        """带指数退避重试的嵌入请求：超时/连接错误/5xx 可重试，其余直接失败。"""
+        last_exc: Exception | None = None
+        for attempt in range(self.retries + 1):
+            try:
+                return self._request_once(inputs)
+            except EmbeddingProviderError:
+                raise
+            except (httpx.TransportError, httpx.HTTPStatusError) as exc:
+                # HTTPStatusError 只有 5xx 才值得重试（4xx 是参数/密钥问题）
+                if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code < 500:
+                    raise EmbeddingProviderError(f"embedding request failed: {exc}") from exc
+                last_exc = exc
+                if attempt < self.retries:
+                    time.sleep(2**attempt)  # 1s / 2s / 4s 指数退避
+        raise EmbeddingProviderError(f"embedding request failed after retries: {last_exc}") from last_exc
+
+    def _request_once(self, inputs: list[str]) -> list[list[float]]:
         try:
-            response = httpx.post(
-                self.endpoint,
-                headers={"Authorization": f"Bearer {self.api_key}"},
-                json={"model": self.model, "input": inputs},
-                timeout=self.timeout_seconds,
-            )
+            with httpx.Client(transport=self.transport) as client:
+                response = client.post(
+                    self.endpoint,
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    json={"model": self.model, "input": inputs},
+                    timeout=self.timeout_seconds,
+                )
             response.raise_for_status()
             payload = response.json()
             items = payload.get("data")
@@ -73,8 +98,9 @@ class OpenAICompatibleEmbeddingProvider:
             return vectors
         except EmbeddingProviderError:
             raise
-        except (httpx.HTTPError, ValueError, TypeError, KeyError) as exc:
-            raise EmbeddingProviderError(f"embedding request failed: {exc}") from exc
+        except (ValueError, TypeError, KeyError, AttributeError) as exc:
+            # 响应结构/解析异常：重试无意义，直接包装为业务错误
+            raise EmbeddingProviderError(f"embedding response is invalid: {exc}") from exc
 
     @staticmethod
     def _endpoint(base_url: str) -> str:

@@ -52,7 +52,38 @@ const QUICK_QUESTIONS = [
   "我们专业培养方案要修多少学分？",
   "缓考应该怎么申请？",
   "最近有什么竞赛可以参加？",
+  "学校周边有什么好吃的？",
 ];
+
+/** 出行方式中文名 */
+const MODE_LABELS: Record<string, string> = {
+  walking: "步行",
+  driving: "驾车",
+  bicycling: "骑行",
+  transit: "公交",
+};
+
+/** 按评分高低着色 */
+function ratingTag(rating: number) {
+  if (!rating) return <Tag>暂无评分</Tag>;
+  const color =
+    rating >= 4.5 ? "green" : rating >= 4.0 ? "blue" : rating >= 3.5 ? "orange" : "default";
+  return <Tag color={color}>⭐ {rating.toFixed(1)}</Tag>;
+}
+
+/** 距离展示：不足 1 公里用米 */
+function formatDistance(distance: number | null | undefined) {
+  if (!distance) return null;
+  return distance >= 1000 ? `${(distance / 1000).toFixed(1)} 公里` : `${Math.round(distance)} 米`;
+}
+
+/** 生成高德 URI 导航链接（步行） */
+function amapNavigationUrl(location: string, name?: string) {
+  const [lng, lat] = String(location ?? "").split(",");
+  if (!lng || !lat) return null;
+  const label = name ? `,${encodeURIComponent(name)}` : "";
+  return `https://uri.amap.com/navigation?to=${lng},${lat}${label}&mode=walk&coordinate=gaode`;
+}
 
 /** 根据后端 result_type 渲染结构化卡片 */
 function ResultCard({ chat }: { chat: ChatData }) {
@@ -162,6 +193,91 @@ function ResultCard({ chat }: { chat: ChatData }) {
               </Typography.Paragraph>
             </Card>
           ))}
+        </Space>
+      );
+    }
+    case "map_places": {
+      const places = (data.places ?? []) as any[];
+      return (
+        <List
+          size="small"
+          dataSource={places}
+          renderItem={(item) => {
+            const url = amapNavigationUrl(item.location, item.name);
+            return (
+              <List.Item style={{ paddingInline: 0 }}>
+                <div style={{ width: "100%" }}>
+                  <Space wrap>
+                    <Typography.Text strong>{item.name}</Typography.Text>
+                    {ratingTag(Number(item.rating))}
+                    {Number(item.cost) > 0 && (
+                      <Tag color="gold">人均 ¥{item.cost}</Tag>
+                    )}
+                    {Number(item.comment_num) > 0 && (
+                      <Tag>{item.comment_num} 条点评</Tag>
+                    )}
+                  </Space>
+                  <div style={{ marginTop: 4 }}>
+                    {item.distance ? (
+                      <Typography.Text type="secondary" style={{ marginRight: 8 }}>
+                        📍 距中心 {formatDistance(item.distance)}
+                      </Typography.Text>
+                    ) : null}
+                    {item.address ? (
+                      <Typography.Text type="secondary">{item.address}</Typography.Text>
+                    ) : null}
+                  </div>
+                  {item.tel ? (
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      📞 {item.tel}
+                    </Typography.Text>
+                  ) : null}
+                  {url && (
+                    <div style={{ marginTop: 4 }}>
+                      <a href={url} target="_blank" rel="noreferrer">
+                        查看位置与导航 ↗
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </List.Item>
+            );
+          }}
+        />
+      );
+    }
+    case "map_route": {
+      const modeLabel = MODE_LABELS[data.mode] ?? data.mode ?? "步行";
+      const steps = (data.steps ?? []) as string[];
+      return (
+        <Space direction="vertical" style={{ width: "100%" }}>
+          <Descriptions size="small" column={{ xs: 1, sm: 3 }} bordered>
+            <Descriptions.Item label="出行方式">{modeLabel}</Descriptions.Item>
+            <Descriptions.Item label="距离">
+              {data.distance_text ?? "-"}
+            </Descriptions.Item>
+            <Descriptions.Item label="预计耗时">
+              {data.duration_text ?? "-"}
+            </Descriptions.Item>
+          </Descriptions>
+          {steps.length > 0 && (
+            <Typography.Paragraph
+              style={{ marginBottom: 0, whiteSpace: "pre-wrap" }}
+              type="secondary"
+            >
+              {steps.map((step, i) => `${i + 1}. ${step}`).join("\n")}
+            </Typography.Paragraph>
+          )}
+          {data.navigation_url && (
+            <Button
+              type="primary"
+              size="small"
+              href={data.navigation_url}
+              target="_blank"
+            >
+              打开高德导航
+            </Button>
+          )}
         </Space>
       );
     }

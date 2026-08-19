@@ -16,6 +16,8 @@ ResultType = Literal[
     "training_plan",
     "knowledge",
     "information",
+    "map_places",
+    "map_route",
 ]
 
 

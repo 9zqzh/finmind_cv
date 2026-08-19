@@ -32,6 +32,7 @@ def build_knowledge_service(
                 model=settings.embedding_model,
                 timeout_seconds=settings.embedding_timeout_seconds,
                 batch_size=settings.embedding_batch_size,
+                retries=settings.embedding_retries,
             )
             vector_store = ChromaVectorStore(
                 chroma_dir,
@@ -47,4 +48,6 @@ def build_knowledge_service(
         vector_store=vector_store,
         embedding_provider=provider,
         vector_min_score=settings.knowledge_vector_min_score,
+        vector_confidence_min=settings.knowledge_vector_confidence_min,
+        vector_top_k=settings.knowledge_vector_top_k,
     )

@@ -15,6 +15,7 @@ from pydantic import Field
 from pydantic_ai import Agent, RunContext
 
 from app.adapters import academic as academic_adapter
+from app.adapters import amap as amap_adapter
 from app.adapters import gduf_web as gduf_web_adapter
 from app.adapters import jwxt as jwxt_adapter
 from app.knowledge import KnowledgeService
@@ -38,6 +39,8 @@ RESULT_TYPES: dict[str, str] = {
     "query_competition_detail": "competition_detail",
     "query_competition_notices": "competition_notice",
     "query_competition_clubs": "competition_club",
+    "search_map_places": "map_places",
+    "query_map_route": "map_route",
 }
 
 
@@ -406,6 +409,52 @@ def register_tools(agent: Agent) -> None:
         except ApiError as exc:
             return _record_failure(ctx, "query_competition_clubs", exc.message)
         _record_success(ctx, "query_competition_clubs", data)
+        return data
+
+    @agent.tool
+    async def search_map_places(
+        ctx: RunContext[AgentDeps],
+        keywords: Annotated[
+            str,
+            Field(description="要搜索的地点或美食类型关键词，如“烤肉”“游乐园”“奶茶店”"),
+        ],
+        location: str | None = Field(
+            default=None,
+            description="搜索中心位置（文字地名或“经度,纬度”），不传表示以广东金融学院清远校区为中心",
+        ),
+        radius: int = Field(
+            default=5000, description="搜索半径（米），默认 5000"
+        ),
+        city: str = Field(default="清远", description="城市名，用于无坐标时的城市限定搜索"),
+    ) -> dict[str, Any]:
+        """搜索地图周边地点（美食、景点、娱乐等），返回地点名称、地址、电话、星级评分、人均消费、距校距离与导航链接。调用时机：用户询问学校周边有什么好吃的/好玩的、想找某类地方（如“学校附近有什么烤肉店”“清远哪里好玩”）。调用后基于返回结果推荐评分高、距离近的地点，用自己的话介绍并附上高德导航链接，不要输出原始 JSON。注意：高德接口只提供星级评分与人均消费、不提供顾客评论文本；本工具结果会以卡片展示，请如实引用数据。"""
+        try:
+            data = await amap_adapter.search_map_places(
+                keywords, location=location, radius=radius, city=city
+            )
+        except ApiError as exc:
+            return _record_failure(ctx, "search_map_places", exc.message)
+        _record_success(ctx, "search_map_places", data)
+        return data
+
+    @agent.tool
+    async def query_map_route(
+        ctx: RunContext[AgentDeps],
+        destination: Annotated[
+            str,
+            Field(description="目的地：优先传 search_map_places 返回结果中的 location 字段（“经度,纬度”精确坐标，避免长店名被地理编码到错误位置）；也可传地点名称（如“万达广场”），名称解析失败或超距时会自动回退搜索"),
+        ],
+        mode: str = Field(
+            default="walking",
+            description="出行方式：walking 步行 / driving 驾车 / bicycling 骑行 / transit 公交，默认 walking",
+        ),
+    ) -> dict[str, Any]:
+        """规划从广东金融学院清远校区到目的地的出行路线，返回距离、预计耗时、路线步骤与高德导航链接。调用时机：用户询问去某地怎么走/多远/要多久（如“想去万达广场怎么走”“学校到清远站多远”），或看过 search_map_places 结果后要为某个地点规划路线。出行方式选择：3 公里内建议步行或骑行，更远建议公交或驾车。本工具结果会以卡片展示，请基于返回数据用自己的话说明。"""
+        try:
+            data = await amap_adapter.query_map_route(destination, mode=mode)
+        except ApiError as exc:
+            return _record_failure(ctx, "query_map_route", exc.message)
+        _record_success(ctx, "query_map_route", data)
         return data
 
 

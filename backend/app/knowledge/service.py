@@ -27,6 +27,8 @@ _SUPPORTED_SUFFIXES = {".md", ".txt", ".json"}
 _STOP_CHARS = set("的了吗呢吧啊哦嗯")
 
 CHUNK_MAX_CHARS = 400
+# 超长段落二次切分时的相邻切片重叠长度：避免句子/表格边界被硬切切断语义
+CHUNK_OVERLAP_CHARS = 50
 # 命中得分低于最高分该比例的视为噪声，不返回
 MIN_SCORE_RATIO = 0.3
 # 弱命中（命中单元数不足）且得分远低于最佳结果的切片视为噪声
@@ -36,6 +38,8 @@ STRONG_SCORE_RATIO = 0.8
 MIN_ABSOLUTE_SCORE = 4.0
 # 命中 2 个及以上分词单元时的额外加权：多词命中比单词频繁出现更能说明相关
 MULTI_MATCH_BONUS = 5.0
+# 混合检索 RRF 融合常数：控制排名对分数的贡献（标准值 60）
+RRF_K = 60
 
 
 @dataclass
@@ -66,7 +70,12 @@ class KnowledgeService:
     chunks: list[Chunk] = field(default_factory=list)
     vector_store: Any | None = field(default=None, repr=False)
     embedding_provider: "EmbeddingProvider | None" = field(default=None, repr=False)
-    vector_min_score: float = field(default=0.75, repr=False)
+    vector_min_score: float = field(default=0.5, repr=False)
+    # 关键词零命中时向量结果的置信门槛：embedding 对完全无关文本也会给出
+    # 0.6-0.75 的“擦边”分数，低于该值时视为未检索到（避免无关查询返回最接近片段）
+    vector_confidence_min: float = field(default=0.75, repr=False)
+    # 混合检索时向量/关键词各自召回的候选数（融合后再截断到 top_k）
+    vector_top_k: int = field(default=20, repr=False)
     vector_enabled: bool = field(default=False, init=False)
 
     @classmethod
@@ -76,13 +85,17 @@ class KnowledgeService:
         *,
         vector_store: Any | None = None,
         embedding_provider: "EmbeddingProvider | None" = None,
-        vector_min_score: float = 0.75,
+        vector_min_score: float = 0.5,
+        vector_confidence_min: float = 0.75,
+        vector_top_k: int = 20,
     ) -> "KnowledgeService":
         service = cls()
         service.load_directory(Path(directory))
         service.vector_store = vector_store
         service.embedding_provider = embedding_provider
         service.vector_min_score = max(0.0, min(1.0, vector_min_score))
+        service.vector_confidence_min = max(0.0, min(1.0, vector_confidence_min))
+        service.vector_top_k = max(vector_top_k, 1)
         service._build_vector_index()
         return service
 
@@ -159,8 +172,22 @@ class KnowledgeService:
             paragraphs.append("\n".join(current))
         buffer.clear()
         for paragraph in paragraphs:
-            # 段落过长时再按固定长度二次切分
-            for start in range(0, len(paragraph), CHUNK_MAX_CHARS):
+            if len(paragraph) <= CHUNK_MAX_CHARS:
+                piece = paragraph.strip()
+                if piece:
+                    self.chunks.append(
+                        Chunk(
+                            text=piece,
+                            source=source,
+                            title=title,
+                            resource_path=resource_path,
+                        )
+                    )
+                continue
+            # 段落过长时按固定长度二次切分，相邻切片保留重叠，
+            # 避免语义在边界处被硬切截断（如表格行、长句）
+            start = 0
+            while start < len(paragraph):
                 piece = paragraph[start : start + CHUNK_MAX_CHARS].strip()
                 if piece:
                     self.chunks.append(
@@ -171,15 +198,19 @@ class KnowledgeService:
                             resource_path=resource_path,
                         )
                     )
+                if start + CHUNK_MAX_CHARS >= len(paragraph):
+                    break
+                start += CHUNK_MAX_CHARS - CHUNK_OVERLAP_CHARS
 
     # ---- 检索 ----
 
     def search(self, query: str, top_k: int = 3) -> list[SearchResult]:
         if self.vector_enabled:
             try:
-                return self._vector_search(query, top_k)
+                return self._hybrid_search(query, top_k)
             except Exception:
-                self.vector_enabled = False
+                # 本轮意外失败回退关键词；不永久关闭向量检索，下次仍尝试
+                pass
         return self._keyword_search(query, top_k)
 
     def _build_vector_index(self) -> None:
@@ -208,6 +239,79 @@ class KnowledgeService:
             for hit in hits
         ]
         return [result for result in results if result.score >= self.vector_min_score]
+
+    def _hybrid_search(self, query: str, top_k: int) -> list[SearchResult]:
+        """向量 + 关键词双路召回，RRF 融合排序。
+
+        任一路径失败（如嵌入接口超时、关键词无命中）不影响另一路，
+        保证单次查询总能得到当前可用途径的最佳结果。
+        """
+        vector_results: list[SearchResult] = []
+        keyword_results: list[SearchResult] = []
+        try:
+            vector_results = self._vector_search(query, self.vector_top_k)
+        except Exception:
+            vector_results = []
+        try:
+            keyword_results = self._keyword_search(query, self.vector_top_k)
+        except Exception:
+            keyword_results = []
+        if not vector_results:
+            return keyword_results[:top_k]
+        if not keyword_results:
+            # 关键词零命中时要求向量结果达到置信门槛：
+            # embedding 对完全无关文本也会给出 0.6-0.75 的“擦边”分数，
+            # 不加门槛会让完全无关的查询也返回语义最接近的片段
+            if vector_results[0].score < self.vector_confidence_min:
+                return []
+            return vector_results[:top_k]
+        return self._fuse(vector_results, keyword_results, top_k)
+
+    @staticmethod
+    def _fuse(
+        vector_results: list[SearchResult],
+        keyword_results: list[SearchResult],
+        top_k: int,
+    ) -> list[SearchResult]:
+        """RRF（Reciprocal Rank Fusion）：按排名倒数加权，跨路径稳定融合。"""
+
+        def identity(result: SearchResult) -> tuple[str, str, str]:
+            return (result.text, result.source, result.title)
+
+        vector_ranks = {identity(r): rank for rank, r in enumerate(vector_results)}
+        keyword_ranks = {identity(r): rank for rank, r in enumerate(keyword_results)}
+        merged: dict[tuple[str, str, str], SearchResult] = {}
+        for result in vector_results + keyword_results:
+            key = identity(result)
+            if key in merged:
+                continue
+            fused = 0.0
+            if key in vector_ranks:
+                fused += 1.0 / (RRF_K + vector_ranks[key])
+            if key in keyword_ranks:
+                fused += 1.0 / (RRF_K + keyword_ranks[key])
+            merged[key] = SearchResult(
+                text=result.text,
+                source=result.source,
+                title=result.title,
+                score=fused,
+                resource_path=result.resource_path,
+            )
+        results = sorted(merged.values(), key=lambda item: item.score, reverse=True)
+        # 融合分归一化到 0-1（第一名恒为 1.0），保持与向量相似度语义一致
+        best = results[0].score
+        normalized = []
+        for result in results[:top_k]:
+            normalized.append(
+                SearchResult(
+                    text=result.text,
+                    source=result.source,
+                    title=result.title,
+                    score=round(result.score / best, 4) if best else 0.0,
+                    resource_path=result.resource_path,
+                )
+            )
+        return normalized
 
     def _keyword_search(self, query: str, top_k: int) -> list[SearchResult]:
         tokens = self._tokenize(query)

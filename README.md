@@ -68,6 +68,20 @@ docker compose --profile vector up --build -d
 
 后端会通过 Compose 服务名 `chroma:8000` 连接向量数据库；未启动 Profile 或嵌入配置不完整时会自动回退到关键词检索。
 
+配置完整时启用**混合检索**：向量（Chroma）与关键词双路召回后按 RRF 融合排序，任一路径失败（如嵌入接口超时、配额耗尽）自动降级到另一路，单次故障不会永久关闭向量检索。可通过 `KNOWLEDGE_VECTOR_MIN_SCORE`（默认 0.5，仅过滤语义无关项）与 `KNOWLEDGE_VECTOR_TOP_K`（默认 20）调参。
+
+### 4. 可选地图查询（高德）
+
+在 `.env` 中填写高德开放平台（https://lbs.amap.com ，免费）申请的 Web 服务 Key 后，即可在 AI 对话中使用周边地点查询与路线规划（默认起点为广东金融学院清远校区）：
+
+```dotenv
+AMAP_API_KEY=你的高德Web服务Key
+# 可选：百度地图开放平台 Key，用于补充地点点评数与评分
+BAIDU_MAP_API_KEY=
+```
+
+未配置 Key 时，Agent 会如实提示地图功能不可用，不影响其他功能。
+
 ## GitHub Release 自动部署
 
 普通分支推送和 Pull Request 只运行前后端测试，不构建或发布 Docker 镜像。只有在 GitHub 仓库的 Releases 页面创建并发布 Release 后，`.github/workflows/ci-cd.yml` 才会：

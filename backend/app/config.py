@@ -39,8 +39,19 @@ class Settings(BaseSettings):
     chroma_dir: str = Field(default="data/chroma", alias="CHROMA_DIR")
     chroma_host: str = Field(default="", alias="CHROMA_HOST")
     chroma_port: int = Field(default=8001, alias="CHROMA_PORT")
+    # 向量分数阈值：仅过滤语义明显无关项（text-embedding-v4 相似度分布偏低，
+    # 阈值过高会导致相关结果被误过滤），最终排序由混合检索融合分数决定
     knowledge_vector_min_score: float = Field(
-        default=0.75, alias="KNOWLEDGE_VECTOR_MIN_SCORE"
+        default=0.5, alias="KNOWLEDGE_VECTOR_MIN_SCORE"
+    )
+    # 关键词零命中时向量结果的置信门槛：embedding 对完全无关文本也会给出
+    # 0.6-0.75 的“擦边”分数，低于该值时视为未检索到（避免无关查询返回最接近片段）
+    knowledge_vector_confidence_min: float = Field(
+        default=0.75, alias="KNOWLEDGE_VECTOR_CONFIDENCE_MIN"
+    )
+    # 混合检索时向量与关键词各自召回的最大候选数，融合后取 top_k
+    knowledge_vector_top_k: int = Field(
+        default=20, alias="KNOWLEDGE_VECTOR_TOP_K"
     )
     embedding_base_url: str = Field(default="", alias="EMBEDDING_BASE_URL")
     embedding_api_key: str = Field(default="", alias="EMBEDDING_API_KEY")
@@ -50,6 +61,8 @@ class Settings(BaseSettings):
         default=30.0, alias="EMBEDDING_TIMEOUT_SECONDS"
     )
     embedding_batch_size: int = Field(default=10, alias="EMBEDDING_BATCH_SIZE")
+    # 嵌入请求失败时的重试次数（指数退避），网络抖动不影响检索稳定性
+    embedding_retries: int = Field(default=2, alias="EMBEDDING_RETRIES")
 
     # Agent 运行参数
     agent_max_iterations: int = Field(default=4, alias="AGENT_MAX_ITERATIONS")
@@ -68,6 +81,19 @@ class Settings(BaseSettings):
     app_env: str = Field(default="development", alias="APP_ENV")
     session_ttl_minutes: int = Field(default=120, alias="SESSION_TTL_MINUTES")
     login_session_ttl_days: int = Field(default=7, alias="LOGIN_SESSION_TTL_DAYS")
+
+    # 地图服务（高德 Web 服务 API；百度地图为可选的口碑补充源）
+    amap_api_key: str = Field(default="", alias="AMAP_API_KEY")
+    # 路线规划默认起点，留空使用“广东金融学院清远校区”
+    amap_default_origin: str = Field(
+        default="广东金融学院清远校区", alias="AMAP_DEFAULT_ORIGIN"
+    )
+    # 默认起点经纬度兑底（“经度,纬度”）；留空表示用地理编码接口解析
+    amap_default_location: str = Field(default="", alias="AMAP_DEFAULT_LOCATION")
+    # 周边搜索默认半径（米）
+    amap_search_radius: int = Field(default=5000, alias="AMAP_SEARCH_RADIUS")
+    # 可选：百度地图开放平台 key，用于补充点评数/评分（未配置则仅用高德数据）
+    baidu_map_api_key: str = Field(default="", alias="BAIDU_MAP_API_KEY")
 
     # PostgreSQL / sensitive session data
     database_url: str = Field(default="", alias="DATABASE_URL")

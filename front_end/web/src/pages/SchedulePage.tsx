@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Button,
   Card,
+  Empty,
   InputNumber,
   message,
   Select,
@@ -73,14 +74,25 @@ function ScheduleGrid({
                           }
                         }}
                       >
-                        <Typography.Text strong>{entry.course_name}</Typography.Text>
-                        <Typography.Text type="secondary">
+                        <Typography.Text strong className="schedule-grid__course-name">
+                          {entry.course_name}
+                        </Typography.Text>
+                        <Typography.Text
+                          type="secondary"
+                          className="schedule-grid__course-meta"
+                        >
                           {entry.teacher ?? "教师未安排"}
                         </Typography.Text>
-                        <Typography.Text type="secondary">
+                        <Typography.Text
+                          type="secondary"
+                          className="schedule-grid__course-meta"
+                        >
                           {entry.classroom ?? "教室未安排"}
                         </Typography.Text>
-                        <Typography.Text type="secondary">
+                        <Typography.Text
+                          type="secondary"
+                          className="schedule-grid__course-meta"
+                        >
                           {entry.weeks_text || "全学期"}
                         </Typography.Text>
                       </div>
@@ -98,7 +110,69 @@ function ScheduleGrid({
   );
 }
 
-export default function SchedulePage() {
+function ScheduleMobileList({
+  schedule,
+  selectedCourse,
+  onCourseClick,
+}: {
+  schedule: Schedule;
+  selectedCourse: ScheduleEntry | null;
+  onCourseClick: (course: ScheduleEntry) => void;
+}) {
+  const sortedItems = [...schedule.items].sort(
+    (a, b) => a.weekday - b.weekday || a.period - b.period,
+  );
+
+  if (sortedItems.length === 0) {
+    return <Empty className="mobile-only" description="当前筛选条件下没有课程" />;
+  }
+
+  return (
+    <div className="schedule-mobile-list mobile-only">
+      {WEEKDAY_NAMES.slice(1).map((weekday, index) => {
+        const dayItems = sortedItems.filter((item) => item.weekday === index + 1);
+        if (dayItems.length === 0) return null;
+
+        return (
+          <div key={weekday} className="schedule-mobile-day">
+            <Typography.Text className="schedule-mobile-day__title">
+              {weekday}
+            </Typography.Text>
+            {dayItems.map((entry, itemIndex) => (
+              <div
+                key={`${entry.course_name}-${entry.teacher ?? ""}-${itemIndex}`}
+                className={`schedule-mobile-course${
+                  selectedCourse === entry ? " schedule-mobile-course--selected" : ""
+                }`}
+                role="button"
+                tabIndex={0}
+                onClick={() => onCourseClick(entry)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onCourseClick(entry);
+                  }
+                }}
+              >
+                <Space direction="vertical" size={4} style={{ width: "100%" }}>
+                  <Typography.Text strong>{entry.course_name}</Typography.Text>
+                  <Typography.Text type="secondary">
+                    {entry.period_name} · {entry.teacher ?? "教师未安排"}
+                  </Typography.Text>
+                  <Typography.Text type="secondary">
+                    {entry.classroom ?? "教室未安排"} · {entry.weeks_text || "全学期"}
+                  </Typography.Text>
+                </Space>
+              </div>
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export function ScheduleContent() {
   const { username } = useAuth();
   const termOptions = useMemo(() => getTermOptions(username), [username]);
   const [term, setTerm] = useState("");
@@ -127,13 +201,14 @@ export default function SchedulePage() {
   };
 
   return (
-    <Card title="我的课表">
-      <Space style={{ marginBottom: 16 }} wrap>
+    <>
+      <Space className="query-toolbar" style={{ marginBottom: 16 }} wrap>
         <Select
           value={term}
           options={termOptions}
           onChange={setTerm}
           placeholder="选择学期"
+          className="query-toolbar__control"
           style={{ width: 180 }}
         />
         <InputNumber
@@ -142,6 +217,7 @@ export default function SchedulePage() {
           min={1}
           max={30}
           placeholder="周次（可选）"
+          className="query-toolbar__control"
         />
         <Button type="primary" onClick={query} loading={loading}>
           查询
@@ -149,7 +225,7 @@ export default function SchedulePage() {
       </Space>
       {schedule && (
         <>
-          <Typography.Paragraph type="secondary">
+          <Typography.Paragraph>
             {selectedCourse ? (
               <>
                 课程：{selectedCourse.course_name} ·{" "}
@@ -172,8 +248,21 @@ export default function SchedulePage() {
             selectedCourse={selectedCourse}
             onCourseClick={setSelectedCourse}
           />
+          <ScheduleMobileList
+            schedule={schedule}
+            selectedCourse={selectedCourse}
+            onCourseClick={setSelectedCourse}
+          />
         </>
       )}
+    </>
+  );
+}
+
+export default function SchedulePage() {
+  return (
+    <Card title="我的课表">
+      <ScheduleContent />
     </Card>
   );
 }

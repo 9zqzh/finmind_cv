@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Card, message, Select, Space, Table, Typography } from "antd";
+import { Button, Card, Empty, message, Select, Space, Table, Typography } from "antd";
 import { api, ApiBizError } from "../api/client";
 import type { ClassroomEntry, ClassroomSchedule } from "../api/types";
 import { useAuth } from "../context/AuthContext";
@@ -7,7 +7,30 @@ import { getDefaultTerm, getTermOptions } from "../utils/terms";
 
 const WEEKDAY_NAMES = ["", "周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 
-export default function ClassroomSchedulePage() {
+function MobileClassroomTable({ result }: { result: ClassroomSchedule }) {
+  if (result.items.length === 0) {
+    return <Empty className="mobile-only" description="当前条件下未查询到占用课程" />;
+  }
+
+  return (
+    <Table<ClassroomEntry>
+      className="mobile-grade-table mobile-classroom-table"
+      rowKey={(r, idx) => `${r.classroom}-${r.weekday}-${r.period}-${idx}`}
+      dataSource={result.items}
+      size="small"
+      pagination={false}
+      bordered
+      columns={[
+        { title: "星期", dataIndex: "weekday", width: 36, align: "center", render: (v: number) => WEEKDAY_NAMES[v] ?? v },
+        { title: "节次", dataIndex: "period", width: 48, align: "center" },
+        { title: "课程", dataIndex: "course_name" },
+        { title: "班级", dataIndex: "class_name", width: 128, align: "center", render: (v: string | null) => v ?? "-" },
+      ]}
+    />
+  );
+}
+
+export function ClassroomScheduleContent() {
   const { username } = useAuth();
   const termOptions = useMemo(() => getTermOptions(username), [username]);
   const [term, setTerm] = useState("");
@@ -108,47 +131,51 @@ export default function ClassroomSchedulePage() {
   ];
 
   return (
-    <Card title="教室课表查询">
-      <Space direction="vertical" style={{ width: "100%" }}>
-        <Typography.Text type="secondary">
-          按校区/教学楼查询某学期该教学楼内所有教室的上课安排（参数可留空查全部）。
-        </Typography.Text>
-        <Space wrap>
-          <Select
-            value={term}
-            options={termOptions}
-            onChange={setTerm}
-            placeholder="选择学期"
-            style={{ width: 180 }}
-          />
-          <Select
-            value={campus || undefined}
-            onChange={setCampus}
-            placeholder="选择校区"
-            allowClear
-            style={{ width: 160 }}
-            options={[
-              { label: "广州校区", value: "1" },
-              { label: "肇庆校区", value: "2" },
-              { label: "清远校区", value: "r0" },
-            ]}
-          />
-          <Select
-            value={building}
-            onChange={setBuilding}
-            placeholder="选择教学楼"
-            allowClear
-            loading={buildingsLoading}
-            disabled={!campus}
-            style={{ width: 160 }}
-            options={buildingOptions}
-          />
-          <Button type="primary" loading={loading} onClick={query}>
-            查询
-          </Button>
-        </Space>
-        {result && (
+    <>
+      <Typography.Text type="secondary">
+        按校区/教学楼查询某学期该教学楼内所有教室的上课安排（参数可留空查全部）。
+      </Typography.Text>
+      <Space className="query-toolbar" wrap>
+        <Select
+          value={term}
+          options={termOptions}
+          onChange={setTerm}
+          placeholder="选择学期"
+          className="query-toolbar__control"
+          style={{ width: 180 }}
+        />
+        <Select
+          value={campus || undefined}
+          onChange={setCampus}
+          placeholder="选择校区"
+          allowClear
+          className="query-toolbar__control"
+          style={{ width: 160 }}
+          options={[
+            { label: "广州校区", value: "1" },
+            { label: "肇庆校区", value: "2" },
+            { label: "清远校区", value: "r0" },
+          ]}
+        />
+        <Select
+          value={building}
+          onChange={setBuilding}
+          placeholder="选择教学楼"
+          allowClear
+          loading={buildingsLoading}
+          disabled={!campus}
+          className="query-toolbar__control"
+          style={{ width: 160 }}
+          options={buildingOptions}
+        />
+        <Button type="primary" loading={loading} onClick={query}>
+          查询
+        </Button>
+      </Space>
+      {result && (
+        <>
           <Table<ClassroomEntry>
+            className="desktop-table"
             rowKey={(r, idx) => `${r.classroom}-${r.weekday}-${r.period}-${idx}`}
             columns={columns}
             dataSource={result.items}
@@ -157,8 +184,17 @@ export default function ClassroomSchedulePage() {
             bordered
             scroll={{ x: 800 }}
           />
-        )}
-      </Space>
+          <MobileClassroomTable result={result} />
+        </>
+      )}
+    </>
+  );
+}
+
+export default function ClassroomSchedulePage() {
+  return (
+    <Card title="教室课表查询">
+      <ClassroomScheduleContent />
     </Card>
   );
 }

@@ -77,6 +77,7 @@ export default function LoginPage() {
 
   return (
     <div
+      className="login-page"
       style={{
         minHeight: "100vh",
         display: "flex",
@@ -85,7 +86,10 @@ export default function LoginPage() {
         background: "linear-gradient(135deg, #e0ecff 0%, #f5f7fa 100%)",
       }}
     >
-      <Card style={{ width: 400, boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
+      <Card
+        className="login-card"
+        style={{ width: "100%", maxWidth: 400, boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}
+      >
         <div style={{ textAlign: "center" }}>
           <img
             src={logo}
@@ -131,7 +135,7 @@ export default function LoginPage() {
             />
           </Form.Item>
           <Form.Item>
-            <div style={{ display: "flex", gap: 12 }}>
+            <div className="login-captcha-row" style={{ display: "flex", gap: 12 }}>
               <Form.Item
                 name="captcha"
                 noStyle
@@ -149,6 +153,7 @@ export default function LoginPage() {
                   src={captcha.image}
                   alt="验证码"
                   onClick={refreshCaptcha}
+                  className="login-captcha-image"
                   style={{
                     height: 40,
                     cursor: "pointer",

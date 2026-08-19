@@ -4,26 +4,81 @@ body {
     "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   color: #1d2939;
   background: #f5f9ff;
+  overflow-x: hidden;
 }
 
 #root {
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 * {
   box-sizing: border-box;
 }
 
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+}
+
+.app-content {
+  min-width: 0;
+}
+
+.mobile-only {
+  display: none;
+}
+
+.desktop-only {
+  display: initial;
+}
+
+.query-toolbar {
+  margin-bottom: 16px;
+}
+
+.query-toolbar .ant-space-item {
+  min-width: 0;
+}
+
+.query-toolbar__control {
+  min-width: 160px;
+}
+
+.mobile-card-list {
+  display: none;
+}
+
+.mobile-record-card {
+  border: 1px solid #d9e8f7;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.mobile-record-card .ant-card-body {
+  padding: 12px;
+}
+
+.mobile-record-card__meta {
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .schedule-grid-scroll {
   border: 1px solid #d9e8f7;
   border-radius: 6px;
   background: #ffffff;
+  overflow-x: auto;
 }
 
 .schedule-grid {
   display: grid;
   grid-template-columns: repeat(8, minmax(min-content, 1fr));
   width: 100%;
+  min-width: 880px;
 }
 
 .schedule-grid__row {
@@ -171,4 +226,639 @@ body {
 .markdown-body th {
   background: #eef7ff;
   font-weight: 600;
+}
+
+@media (max-width: 767px) {
+  body {
+    background: #f5f9ff;
+  }
+
+  .mobile-only {
+    display: block;
+  }
+
+  .desktop-only {
+    display: none !important;
+  }
+
+  .app-header {
+    height: 56px !important;
+    padding: 0 12px !important;
+    line-height: 56px !important;
+  }
+
+  .app-header__brand {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .app-header__brand .ant-space-item:last-child {
+    min-width: 0;
+  }
+
+  .app-header__logo {
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 12px !important;
+    transform: translateY(10px) !important;
+  }
+
+  .app-header__title {
+    max-width: none !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+    font-size: 15px !important;
+    letter-spacing: 0 !important;
+    line-height: 1.2;
+  }
+
+  .ant-drawer .ant-drawer-body {
+    font-size: 13px !important;
+  }
+
+  .ant-drawer .ant-menu-item {
+    font-size: 13px !important;
+    height: 38px !important;
+    line-height: 38px !important;
+  }
+
+  .ant-drawer .ant-menu-item .anticon {
+    font-size: 15px !important;
+  }
+
+  .ant-tabs-nav {
+    display: flex !important;
+    align-items: center;
+  }
+
+  .ant-tabs-nav-wrap {
+    overflow: visible !important;
+    flex: auto;
+  }
+
+  .ant-tabs-nav-list {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    width: 100% !important;
+  }
+
+  .ant-tabs-ink-bar {
+    display: none !important;
+  }
+
+  .ant-tabs-tab {
+    justify-content: center !important;
+    margin: 0 !important;
+    padding: 8px 4px !important;
+    font-size: 11px !important;
+    white-space: nowrap !important;
+    border-bottom: 1px solid #f0f4fa;
+  }
+
+  .query-toolbar .ant-select .ant-select-selection-item,
+  .query-toolbar .ant-select .ant-select-selection-placeholder,
+  .query-toolbar .ant-btn {
+    font-size: 12px !important;
+  }
+
+  .ant-descriptions-item-label,
+  .ant-descriptions-item-content {
+    font-size: 12px !important;
+  }
+
+  .ant-descriptions {
+    margin-bottom: 10px !important;
+  }
+
+  .ant-tabs-tab-active {
+    background: #eef4ff !important;
+    border-radius: 8px !important;
+  }
+
+  .ant-tabs-tab .anticon {
+    font-size: 15px !important;
+    margin-inline-end: 4px !important;
+  }
+
+  .ant-tabs-tab .ant-tabs-tab-btn {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 4px !important;
+    white-space: nowrap !important;
+  }
+
+  .app-content {
+    padding: 12px !important;
+    overflow-x: hidden !important;
+  }
+
+  .ant-card {
+    max-width: 100%;
+  }
+
+  .ant-card-head {
+    min-height: 48px !important;
+    padding: 0 12px !important;
+  }
+
+  .ant-card-head-title {
+    padding: 12px 0 !important;
+    white-space: normal !important;
+  }
+
+  .ant-card-extra {
+    padding: 10px 0 !important;
+    margin-inline-start: 8px !important;
+  }
+
+  .ant-card-body {
+    padding: 12px !important;
+  }
+
+  .ant-btn,
+  .ant-input,
+  .ant-input-affix-wrapper,
+  .ant-select-selector,
+  .ant-input-number,
+  .ant-input-number-input,
+  .ant-picker,
+  .ant-input-search .ant-input {
+    min-height: 44px;
+  }
+
+  .query-toolbar,
+  .query-toolbar.ant-space,
+  .query-toolbar.ant-space-wrap {
+    display: flex !important;
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+
+  .query-toolbar .ant-space-item,
+  .query-toolbar__control,
+  .query-toolbar .ant-select,
+  .query-toolbar .ant-input-number {
+    width: 100% !important;
+  }
+
+  .query-toolbar .ant-btn {
+    width: 100% !important;
+    height: 30px !important;
+    padding: 0 !important;
+    font-size: 12px !important;
+  }
+
+  .mobile-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .desktop-table {
+    display: none;
+  }
+
+  .schedule-mobile-list {
+    display: none;
+  }
+
+  .schedule-grid-scroll {
+    display: block;
+    overflow-x: hidden;
+  }
+
+  .schedule-grid {
+    min-width: 0;
+    grid-template-columns: repeat(8, 1fr);
+  }
+
+  .schedule-grid__cell {
+    padding: 1px;
+  }
+
+  .schedule-grid__cell--corner,
+  .schedule-grid__cell--header,
+  .schedule-grid__cell--period {
+    font-size: 9px;
+    padding: 1px;
+  }
+
+  .schedule-grid__cell--course {
+    gap: 0;
+  }
+
+  .schedule-grid__course {
+    padding: 1px;
+    gap: 0;
+    border-radius: 2px;
+  }
+
+  .schedule-grid__course-name {
+    font-size: 8px !important;
+    line-height: 1.1;
+  }
+
+  .schedule-grid__course-meta {
+    display: none !important;
+  }
+
+  .schedule-grid__empty {
+    font-size: 8px;
+  }
+
+  .mobile-record-card--row {
+    padding: 0 !important;
+  }
+
+  .mobile-record-card--row .ant-card-body {
+    padding: 8px 10px !important;
+  }
+
+  .mobile-record-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .mobile-record-row__score {
+    font-size: 14px !important;
+    font-weight: 600;
+    flex-shrink: 0;
+    margin: 0 !important;
+    padding: 0 8px !important;
+    line-height: 24px !important;
+  }
+
+  .mobile-record-row__body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .mobile-record-row__name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #000;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mobile-record-row__meta {
+    font-size: 11px;
+    color: #667085;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mobile-record-row__attr {
+    font-size: 11px !important;
+    flex-shrink: 0;
+    margin: 0 !important;
+    padding: 0 6px !important;
+    line-height: 22px !important;
+  }
+
+  .mobile-card-list {
+    gap: 8px;
+  }
+
+  .mobile-grade-table {
+    font-size: 9px;
+  }
+
+  .mobile-grade-table .ant-table {
+    font-size: 9px;
+  }
+
+  .mobile-grade-table .ant-table-thead > tr > th {
+    padding: 4px 2px !important;
+    font-size: 9px;
+    white-space: nowrap;
+  }
+
+  .mobile-grade-table .ant-table-tbody > tr > td {
+    padding: 4px 2px !important;
+    font-size: 9px;
+    white-space: nowrap;
+    line-height: 1.25;
+  }
+
+  .mobile-grade-table .ant-table-tbody > tr > td:first-child {
+    white-space: normal;
+  }
+
+  .mobile-classroom-table .ant-table-tbody > tr > td {
+    padding: 8px 5px !important;
+    white-space: normal !important;
+  }
+
+  .knowledge-page .ant-list-item-meta-title {
+    font-size: 13px !important;
+    line-height: 1.4;
+  }
+
+  .knowledge-page .ant-list-item-meta-description {
+    font-size: 11px !important;
+    line-height: 1.4;
+  }
+
+  .knowledge-page .ant-list-item .ant-btn {
+    font-size: 12px !important;
+    height: 26px !important;
+  }
+
+  .knowledge-page .knowledge-search .ant-input,
+  .knowledge-page .knowledge-search .ant-btn {
+    font-size: 12px !important;
+  }
+
+  .knowledge-page .knowledge-search .ant-input {
+    height: 32px !important;
+  }
+
+  .knowledge-page .knowledge-search .ant-btn {
+    height: 32px !important;
+  }
+
+  .knowledge-page .ant-list-item {
+    padding: 8px 0 !important;
+  }
+
+  .knowledge-page .ant-tag {
+    font-size: 11px !important;
+  }
+
+  .article-list-item .ant-list-item-meta-title a {
+    font-size: 13px !important;
+  }
+
+  .article-list-item .ant-list-item-meta-description .ant-typography {
+    font-size: 11px !important;
+  }
+
+  .article-list-item .ant-typography-paragraph {
+    font-size: 12px !important;
+    margin: 6px 0 0 !important;
+  }
+
+  .article-list-image {
+    width: 100px !important;
+    height: auto !important;
+    border-radius: 6px;
+  }
+
+  .competition-card .ant-typography {
+    font-size: 9px !important;
+    line-height: 1.15 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .competition-card .ant-space > .ant-space-item:first-child .ant-typography {
+    font-size: 12px !important;
+  }
+
+  .competition-card .ant-typography-paragraph {
+    font-size: 9px !important;
+  }
+
+  .competition-card .ant-card-actions {
+    font-size: 9px !important;
+  }
+
+  .competition-card .ant-tag {
+    font-size: 9px !important;
+    line-height: 13px !important;
+    padding: 0 3px !important;
+  }
+
+  .competition-card .ant-space {
+    column-gap: 0 !important;
+    row-gap: 0 !important;
+  }
+
+  .competition-card .ant-card-body {
+    padding: 6px !important;
+  }
+
+  .schedule-mobile-day {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .schedule-mobile-day__title {
+    color: #164b80;
+    font-weight: 600;
+  }
+
+  .schedule-mobile-course {
+    padding: 10px 12px;
+    border: 1px solid #d9e8f7;
+    border-radius: 6px;
+    background: #ffffff;
+  }
+
+  .schedule-mobile-course--selected {
+    border-color: #91caff;
+    background: #e6f4ff;
+  }
+
+  .login-page {
+    min-height: 100dvh !important;
+    padding: 16px;
+    align-items: flex-start !important;
+    padding-top: max(24px, env(safe-area-inset-top));
+  }
+
+  .login-card {
+    width: min(400px, calc(100vw - 32px)) !important;
+  }
+
+  .login-captcha-row {
+    flex-wrap: wrap;
+  }
+
+  .login-captcha-row .ant-input-affix-wrapper {
+    flex: 1 1 160px !important;
+  }
+
+  .login-captcha-image {
+    flex: 0 0 120px;
+    height: 44px !important;
+    object-fit: contain;
+  }
+
+  .chat-page {
+    height: calc(100dvh - 80px) !important;
+    gap: 8px;
+  }
+
+  .chat-list {
+    padding: 0 !important;
+  }
+
+  .chat-welcome {
+    margin-top: 0 !important;
+    padding: 6px 10px !important;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    text-align: left !important;
+  }
+
+  .chat-welcome .ant-typography-title {
+    font-size: 15px !important;
+    line-height: 1.35;
+    margin-bottom: 4px !important;
+  }
+
+  .chat-welcome .ant-typography {
+    font-size: 12px !important;
+  }
+
+  .chat-welcome .ant-space {
+    gap: 4px !important;
+  }
+
+  .chat-welcome .ant-btn {
+    height: 20px !important;
+    padding-inline: 8px !important;
+    font-size: 10px !important;
+    line-height: 20px;
+  }
+
+  .chat-message {
+    gap: 8px !important;
+    margin-bottom: 10px !important;
+  }
+
+  .chat-message .ant-avatar {
+    flex: 0 0 32px;
+    width: 28px;
+    height: 28px;
+    line-height: 28px;
+  }
+
+  .chat-message__content {
+    max-width: calc(100% - 36px) !important;
+    min-width: 0;
+  }
+
+  .chat-bubble {
+    padding: 6px 10px !important;
+    border-radius: 8px !important;
+  }
+
+  .chat-input-bar {
+    padding: 8px 0 calc(8px + env(safe-area-inset-bottom)) !important;
+    background: #f5f9ff;
+  }
+
+  .chat-input-bar .ant-space-compact {
+    display: flex;
+    gap: 6px;
+  }
+
+  .chat-input-bar .ant-input {
+    height: 30px !important;
+    min-height: 30px !important;
+    line-height: 30px !important;
+    border-radius: 6px !important;
+    font-size: 10px !important;
+    padding-inline: 10px !important;
+  }
+
+  .chat-input-bar .ant-input::placeholder {
+    font-size: 11px !important;
+  }
+
+  .chat-input-bar .ant-btn {
+    flex: 0 0 34px;
+    height: 30px !important;
+    min-height: 30px !important;
+    border-radius: 6px !important;
+    padding-inline: 0;
+  }
+
+  .chat-input-bar .ant-btn > span:not(.ant-btn-icon) {
+    display: none;
+  }
+
+  .knowledge-search.ant-space-compact {
+    display: flex;
+    gap: 8px;
+  }
+
+  .knowledge-search.ant-space-compact .ant-input {
+    border-radius: 6px !important;
+  }
+
+  .knowledge-search.ant-space-compact .ant-btn {
+    flex: 0 0 72px;
+    border-radius: 6px !important;
+  }
+
+  .markdown-body {
+    font-size: 13px;
+  }
+
+  .markdown-body table {
+    width: 100%;
+  }
+
+  .ant-tabs-nav {
+    margin-bottom: 12px !important;
+  }
+
+  .ant-tabs-tab {
+    padding: 10px 0 !important;
+  }
+
+  .ant-list-item {
+    align-items: stretch !important;
+  }
+
+  .knowledge-result-item,
+  .article-list-item {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .knowledge-result-item .ant-list-item-action {
+    width: 100%;
+    margin-inline-start: 0 !important;
+  }
+
+  .knowledge-result-item .ant-list-item-action > li {
+    width: 100%;
+    padding-inline: 0 !important;
+  }
+
+  .knowledge-result-item .ant-list-item-action .ant-btn {
+    width: 100%;
+  }
+
+  .article-list-item .ant-list-item-extra {
+    width: 100%;
+    margin-inline-start: 0 !important;
+  }
+
+  .article-list-image {
+    width: 100% !important;
+    max-height: 180px;
+  }
+
+  .competition-modal-content {
+    max-height: calc(100dvh - 160px) !important;
+  }
+
+  .competition-link {
+    word-break: break-all;
+  }
 }

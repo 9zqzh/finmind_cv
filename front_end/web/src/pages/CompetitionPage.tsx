@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { Card, Col, Modal, Row, Tag, Typography, Spin, Space, Empty, Tabs } from "antd";
+import { Card, Col, Grid, Modal, Row, Tag, Typography, Spin, Space, Empty, Tabs } from "antd";
 import {
   ClockCircleOutlined,
   TeamOutlined,
@@ -83,12 +83,15 @@ const formatDateTime = (iso: string | null) => {
 // ---- 组件 ----
 function CompetitionCard({ item }: { item: CompetitionItem }) {
   const [open, setOpen] = useState(false);
+  const screens = Grid.useBreakpoint();
+  const isMobile = !screens.md;
 
   return (
     <>
       <Card
         hoverable
         size="small"
+        className="competition-card"
         style={{ height: "100%" }}
         onClick={() => setOpen(true)}
         actions={[
@@ -171,14 +174,7 @@ function CompetitionCard({ item }: { item: CompetitionItem }) {
             </Typography.Text>
           )}
 
-          {item.summary && (
-            <Typography.Paragraph
-              style={{ fontSize: 12, margin: 0, color: "#667085" }}
-              ellipsis={{ rows: 3 }}
-            >
-              {item.summary}
-            </Typography.Paragraph>
-          )}
+
         </Space>
       </Card>
 
@@ -187,10 +183,13 @@ function CompetitionCard({ item }: { item: CompetitionItem }) {
         open={open}
         onCancel={() => setOpen(false)}
         footer={null}
-        width={700}
-        style={{ top: 40 }}
+        width={isMobile ? "calc(100vw - 32px)" : 700}
+        style={{ top: isMobile ? 16 : 40 }}
       >
-        <div style={{ maxHeight: "65vh", overflowY: "auto", paddingRight: 8 }}>
+        <div
+          className="competition-modal-content"
+          style={{ maxHeight: "65vh", overflowY: "auto", paddingRight: 8 }}
+        >
           <Space direction="vertical" size={12} style={{ width: "100%" }}>
             <Space size={4} wrap>
               <Tag
@@ -247,14 +246,14 @@ function CompetitionCard({ item }: { item: CompetitionItem }) {
             )}
 
             {item.official_url && (
-              <Typography.Text>
+              <Typography.Text className="competition-link">
                 <LinkOutlined style={{ marginRight: 6 }} />
                 官网：<a href={item.official_url} target="_blank" rel="noopener noreferrer">{item.official_url}</a>
               </Typography.Text>
             )}
 
             {item.wechat_article_url && (
-              <Typography.Text>
+              <Typography.Text className="competition-link">
                 <WechatOutlined style={{ marginRight: 6 }} />
                 推文：<a href={item.wechat_article_url} target="_blank" rel="noopener noreferrer">{item.wechat_article_url}</a>
               </Typography.Text>
@@ -281,7 +280,7 @@ function NoticeCard({ item }: { item: NoticeItem }) {
   return (
     <Card size="small" style={{ marginBottom: 12 }}>
       <Space direction="vertical" size={4} style={{ width: "100%" }}>
-        <Space>
+        <Space wrap size={4}>
           <Tag color={PRIORITY_COLORS[item.priority] || "default"}>
             {PRIORITY_LABELS[item.priority] || item.priority}
           </Tag>
@@ -380,7 +379,7 @@ export default function CompetitionPage() {
             ) : (
               <Row gutter={[16, 16]}>
                 {items.map((item) => (
-                  <Col xs={24} sm={12} lg={8} xl={6} key={item.id}>
+                  <Col xs={12} sm={12} lg={8} xl={6} key={item.id}>
                     <CompetitionCard item={item} />
                   </Col>
                 ))}

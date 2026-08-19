@@ -3,6 +3,7 @@ import {
   Button,
   Card,
   Descriptions,
+  Grid,
   message,
   Select,
   Space,
@@ -14,8 +15,36 @@ import type { GradeReport } from "../api/types";
 import { useAuth } from "../context/AuthContext";
 import { getTermOptions } from "../utils/terms";
 
-export default function GradesPage() {
+function MobileGradeTable({ report }: { report: GradeReport }) {
+  return (
+    <Table
+      className="mobile-grade-table"
+      size="small"
+      rowKey="index"
+      dataSource={report.items}
+      pagination={false}
+      bordered
+      columns={[
+        { title: "课程", dataIndex: "course_name", ellipsis: true },
+        {
+          title: "分数",
+          dataIndex: "score",
+          width: 56,
+          align: "center",
+          render: (v: string) => <Tag color="blue">{v}</Tag>,
+        },
+        { title: "学分", dataIndex: "credit", width: 46, align: "center" },
+        { title: "绩点", dataIndex: "grade_point", width: 46, align: "center" },
+        { title: "考核", dataIndex: "assessment_method", width: 58, align: "center" },
+      ]}
+    />
+  );
+}
+
+export function GradesContent() {
   const { username } = useAuth();
+  const screens = Grid.useBreakpoint();
+  const isMobile = !screens.md;
   const termOptions = useMemo(() => getTermOptions(username), [username]);
   const [term, setTerm] = useState("");
   const [loading, setLoading] = useState(false);
@@ -34,13 +63,14 @@ export default function GradesPage() {
   };
 
   return (
-    <Card title="成绩查询">
-      <Space style={{ marginBottom: 16 }}>
+    <>
+      <Space className="query-toolbar" style={{ marginBottom: 16 }}>
         <Select
           value={term}
           onChange={setTerm}
           options={[{ label: "全部学期", value: "" }, ...termOptions]}
           placeholder="按学期过滤（可选）"
+          className="query-toolbar__control"
           style={{ width: 240 }}
         />
         <Button type="primary" onClick={query} loading={loading}>
@@ -49,7 +79,12 @@ export default function GradesPage() {
       </Space>
       {report && (
         <>
-          <Descriptions size="small" column={4} bordered style={{ marginBottom: 16 }}>
+          <Descriptions
+            size="small"
+            column={{ xs: 1, sm: 2, md: 4 }}
+            bordered
+            style={{ marginBottom: 16 }}
+          >
             <Descriptions.Item label="已获学分">
               {report.earned_credits ?? "-"}
             </Descriptions.Item>
@@ -64,6 +99,7 @@ export default function GradesPage() {
             </Descriptions.Item>
           </Descriptions>
           <Table
+            className="desktop-table"
             size="small"
             rowKey="index"
             dataSource={report.items}
@@ -86,8 +122,17 @@ export default function GradesPage() {
               { title: "课程性质", dataIndex: "course_nature", width: 100 },
             ]}
           />
+          {isMobile && <MobileGradeTable report={report} />}
         </>
       )}
+    </>
+  );
+}
+
+export default function GradesPage() {
+  return (
+    <Card title="成绩查询">
+      <GradesContent />
     </Card>
   );
 }

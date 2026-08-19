@@ -3,7 +3,27 @@ import { Button, Card, message, Space, Table, Tag, Typography } from "antd";
 import { api, ApiBizError } from "../api/client";
 import type { TrainingPlan, TrainingPlanCourse } from "../api/types";
 
-export default function TrainingPlanPage() {
+function MobileTrainingPlanTable({ plan }: { plan: TrainingPlan }) {
+  return (
+    <Table<TrainingPlanCourse>
+      className="mobile-grade-table"
+      rowKey={(r) => `${r.term}-${r.course_code}-${r.index}`}
+      dataSource={plan.items}
+      size="small"
+      pagination={false}
+      bordered
+      columns={[
+        { title: "课程", dataIndex: "course_name", ellipsis: true },
+        { title: "学期", dataIndex: "term", width: 78 },
+        { title: "学分", dataIndex: "credit", width: 40, align: "center" },
+        { title: "学时", dataIndex: "total_hours", width: 40, align: "center" },
+        { title: "考核", dataIndex: "assessment_method", width: 52, align: "center" },
+      ]}
+    />
+  );
+}
+
+export function TrainingPlanContent() {
   const [loading, setLoading] = useState(false);
   const [plan, setPlan] = useState<TrainingPlan | null>(null);
 
@@ -38,20 +58,19 @@ export default function TrainingPlanPage() {
   ];
 
   return (
-    <Card
-      title="培养方案"
-      extra={
+    <>
+      <Space className="query-toolbar" wrap>
         <Button type="primary" loading={loading} onClick={query}>
           查询培养方案
         </Button>
-      }
-    >
-      <Space direction="vertical" style={{ width: "100%" }}>
-        <Typography.Text type="secondary">
-          展示当前登录学生的完整培养方案课程清单。
-        </Typography.Text>
-        {plan && (
+      </Space>
+      <Typography.Text type="secondary">
+        展示当前登录学生的完整培养方案课程清单。
+      </Typography.Text>
+      {plan && (
+        <>
           <Table<TrainingPlanCourse>
+            className="desktop-table"
             rowKey={(r) => `${r.term}-${r.course_code}-${r.index}`}
             columns={columns}
             dataSource={plan.items}
@@ -59,8 +78,17 @@ export default function TrainingPlanPage() {
             pagination={{ pageSize: 20 }}
             scroll={{ x: 900 }}
           />
-        )}
-      </Space>
+          <MobileTrainingPlanTable plan={plan} />
+        </>
+      )}
+    </>
+  );
+}
+
+export default function TrainingPlanPage() {
+  return (
+    <Card title="培养方案">
+      <TrainingPlanContent />
     </Card>
   );
 }

@@ -5,10 +5,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import AppLayout from "./layout/AppLayout";
 import LoginPage from "./pages/LoginPage";
 import ChatPage from "./pages/ChatPage";
-import SchedulePage from "./pages/SchedulePage";
-import GradesPage from "./pages/GradesPage";
-import TrainingPlanPage from "./pages/TrainingPlanPage";
-import ClassroomSchedulePage from "./pages/ClassroomSchedulePage";
+import AcademicInfoPage from "./pages/AcademicInfoPage";
 import KnowledgePage from "./pages/KnowledgePage";
 import CompetitionPage from "./pages/CompetitionPage";
 import InformationPage from "./pages/InformationPage";
@@ -40,10 +37,11 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route element={<ProtectedLayout />}>
             <Route path="/" element={<ChatPage />} />
-            <Route path="/schedule" element={<SchedulePage />} />
-            <Route path="/grades" element={<GradesPage />} />
-            <Route path="/training-plan" element={<TrainingPlanPage />} />
-            <Route path="/classroom-schedule" element={<ClassroomSchedulePage />} />
+            <Route path="/academic-info" element={<AcademicInfoPage />} />
+            <Route path="/schedule" element={<Navigate to="/academic-info#schedule" replace />} />
+            <Route path="/grades" element={<Navigate to="/academic-info#grades" replace />} />
+            <Route path="/training-plan" element={<Navigate to="/academic-info#training-plan" replace />} />
+            <Route path="/classroom-schedule" element={<Navigate to="/academic-info#classroom-schedule" replace />} />
             <Route path="/knowledge" element={<KnowledgePage />} />
             <Route path="/information" element={<InformationPage />} />
             <Route path="/competition" element={<CompetitionPage />} />

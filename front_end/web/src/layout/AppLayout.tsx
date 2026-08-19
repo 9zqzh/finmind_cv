@@ -1,14 +1,13 @@
+import { useState } from "react";
 import { useLocation, useNavigate, Outlet } from "react-router-dom";
-import { Button, Layout, Menu, Space, Tag, Typography } from "antd";
+import { Button, Drawer, Grid, Layout, Menu, Space, Tag, Typography } from "antd";
 import {
   BookOutlined,
-  CalendarOutlined,
   DatabaseOutlined,
   HomeOutlined,
   LogoutOutlined,
+  MenuOutlined,
   NotificationOutlined,
-  ReadOutlined,
-  ScheduleOutlined,
   TrophyOutlined,
 } from "@ant-design/icons";
 import { useAuth } from "../context/AuthContext";
@@ -18,10 +17,7 @@ const { Header, Sider, Content } = Layout;
 
 const menuItems = [
   { key: "/", icon: <HomeOutlined />, label: "AI 对话" },
-  { key: "/schedule", icon: <CalendarOutlined />, label: "我的课表" },
-  { key: "/grades", icon: <ScheduleOutlined />, label: "成绩查询" },
-  { key: "/training-plan", icon: <ReadOutlined />, label: "培养方案" },
-  { key: "/classroom-schedule", icon: <BookOutlined />, label: "教室课表" },
+  { key: "/academic-info", icon: <BookOutlined />, label: "教务信息" },
   { key: "/knowledge", icon: <DatabaseOutlined />, label: "知识库" },
   { key: "/information", icon: <NotificationOutlined />, label: "学院资讯" },
   { key: "/competition", icon: <TrophyOutlined />, label: "竞赛信息" },
@@ -31,16 +27,37 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { username, logout } = useAuth();
+  const screens = Grid.useBreakpoint();
+  const isMobile = !screens.md;
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const handleLogout = async () => {
     await logout();
+    setDrawerOpen(false);
     navigate("/login");
   };
+
+  const handleNavigate = (key: string) => {
+    navigate(key);
+    setDrawerOpen(false);
+  };
+
+  const navigationMenu = (
+    <Menu
+      mode="inline"
+      selectedKeys={[location.pathname]}
+      items={menuItems}
+      style={{ height: "100%", borderRight: 0 }}
+      onClick={({ key }) => handleNavigate(key)}
+    />
+  );
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
       <Header
+        className="app-header"
         style={{
+          position: "relative",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -49,10 +66,35 @@ export default function AppLayout() {
           borderBottom: "1px solid #e6eef8",
         }}
       >
-        <Space size={12}>
+        <div
+          style={
+            isMobile
+              ? { flex: "0 0 44px", display: "flex", alignItems: "center" }
+              : undefined
+          }
+        >
+          {isMobile && (
+            <Button
+              type="text"
+              icon={<MenuOutlined />}
+              onClick={() => setDrawerOpen(true)}
+              aria-label="打开导航菜单"
+            />
+          )}
+        </div>
+        <Space
+          size={isMobile ? 8 : 12}
+          className="app-header__brand"
+          style={{
+            flex: 1,
+            justifyContent: isMobile ? "center" : "flex-start",
+            minWidth: 0,
+          }}
+        >
           <img
             src={logo}
             alt="数智金院 FinMind Logo"
+            className="app-header__logo"
             style={{
               width: 50,
               height: 50,
@@ -63,6 +105,7 @@ export default function AppLayout() {
           />
           <Typography.Title
             level={4}
+            className="app-header__title"
             style={{
               color: "transparent",
               margin: 0,
@@ -78,35 +121,75 @@ export default function AppLayout() {
             数智金院 FinMind
           </Typography.Title>
         </Space>
-        <Space>
-          <Tag color="blue">{username ?? "未登录"}</Tag>
-          <Button
-            type="text"
-            style={{ color: "#1d2939" }}
-            icon={<LogoutOutlined />}
-            onClick={handleLogout}
-          >
-            退出登录
-          </Button>
-        </Space>
+        {isMobile ? (
+          <div style={{ flex: "0 0 44px" }} />
+        ) : (
+          <Space>
+            <Tag color="blue">{username ?? "未登录"}</Tag>
+            <Button
+              type="text"
+              style={{ color: "#1d2939" }}
+              icon={<LogoutOutlined />}
+              onClick={handleLogout}
+            >
+              退出登录
+            </Button>
+          </Space>
+        )}
       </Header>
-      <Layout>
-        <Sider
-          width={200}
-          theme="light"
-          style={{ borderRight: "1px solid #e6eef8" }}
-        >
-          <Menu
-            mode="inline"
-            selectedKeys={[location.pathname]}
-            items={menuItems}
-            style={{ height: "100%", borderRight: 0 }}
-            onClick={({ key }) => navigate(key)}
-          />
-        </Sider>
-        <Content
+      <Drawer
+        placement="left"
+        width={isMobile ? "60%" : 280}
+        closable={false}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        styles={{ body: { padding: 0, display: "flex", flexDirection: "column" } }}
+      >
+        <div
           style={{
-            padding: 24,
+            padding: "14px 16px",
+            fontWeight: 700,
+            fontSize: 15,
+            letterSpacing: 1,
+            color: "#1e3a8a",
+            borderBottom: "1px solid #e6eef8",
+            flexShrink: 0,
+          }}
+        >
+          数智金院 FinMind
+        </div>
+        <div style={{ flex: 1 }}>{navigationMenu}</div>
+        <div
+          style={{
+            padding: 16,
+            borderTop: "1px solid #e6eef8",
+            background: "#ffffff",
+          }}
+        >
+          <Space direction="vertical" style={{ width: "100%" }}>
+            <Tag color="blue" style={{ width: "fit-content" }}>
+              {username ?? "未登录"}
+            </Tag>
+            <Button block icon={<LogoutOutlined />} onClick={handleLogout}>
+              退出登录
+            </Button>
+          </Space>
+        </div>
+      </Drawer>
+      <Layout>
+        {!isMobile && (
+          <Sider
+            width={200}
+            theme="light"
+            style={{ borderRight: "1px solid #e6eef8" }}
+          >
+            {navigationMenu}
+          </Sider>
+        )}
+        <Content
+          className="app-content"
+          style={{
+            padding: isMobile ? 12 : 24,
             overflow: "auto",
             background: "#f5f9ff",
           }}

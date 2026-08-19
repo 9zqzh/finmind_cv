@@ -40,10 +40,12 @@ function ArticleList({ items, category }: { items: { title: string; url: string;
       dataSource={items}
       renderItem={(item) => (
         <List.Item
+          className="article-list-item"
           key={item.url}
           extra={
             item.image_url ? (
               <img
+                className="article-list-image"
                 width={140}
                 alt={item.title}
                 src={item.image_url}

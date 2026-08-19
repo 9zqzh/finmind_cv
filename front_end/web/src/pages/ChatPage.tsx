@@ -62,6 +62,7 @@ function ResultCard({ chat }: { chat: ChatData }) {
           rowKey={(row) => `${row.course_name}-${row.weekday}-${row.period}`}
           dataSource={items}
           pagination={false}
+          scroll={{ x: 720 }}
           columns={[
             { title: "课程", dataIndex: "course_name" },
             { title: "星期", dataIndex: "weekday", width: 70 },
@@ -79,7 +80,12 @@ function ResultCard({ chat }: { chat: ChatData }) {
       return (
         <>
           {chat.result_type === "grades" && (
-            <Descriptions size="small" column={4} bordered style={{ marginBottom: 12 }}>
+            <Descriptions
+              size="small"
+              column={{ xs: 1, sm: 2, md: 4 }}
+              bordered
+              style={{ marginBottom: 12 }}
+            >
               <Descriptions.Item label="已获学分">
                 {data.earned_credits ?? "-"}
               </Descriptions.Item>
@@ -99,6 +105,7 @@ function ResultCard({ chat }: { chat: ChatData }) {
             rowKey="index"
             dataSource={items}
             pagination={{ pageSize: 10, hideOnSinglePage: true }}
+            scroll={{ x: 760 }}
             columns={[
               { title: "课程", dataIndex: "course_name" },
               { title: "学期", dataIndex: "term", width: 120 },
@@ -121,6 +128,7 @@ function ResultCard({ chat }: { chat: ChatData }) {
           rowKey={(row) => `${row.classroom}-${row.weekday}-${row.period}`}
           dataSource={items}
           pagination={{ pageSize: 10, hideOnSinglePage: true }}
+          scroll={{ x: 640 }}
           columns={[
             { title: "教室", dataIndex: "classroom", width: 140 },
             { title: "星期", dataIndex: "weekday", width: 70 },
@@ -335,11 +343,18 @@ export default function ChatPage() {
 
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 112px)" }}>
-      <div ref={listRef} style={{ flex: 1, overflowY: "auto", padding: "8px 4px" }}>
+    <div
+      className="chat-page"
+      style={{ display: "flex", flexDirection: "column", height: "calc(100dvh - 112px)" }}
+    >
+      <div
+        ref={listRef}
+        className="chat-list"
+        style={{ flex: 1, overflowY: "auto", padding: "8px 4px" }}
+      >
 
           {messages.length === 0 && (
-            <Card style={{ textAlign: "center", marginTop: 40 }}>
+            <Card className="chat-welcome" style={{ textAlign: "center", marginTop: 40 }}>
               <Typography.Title level={4}>👋 你好，我是数智金院 FinMind</Typography.Title>
               <Typography.Paragraph type="secondary">
                 可以问我课表、成绩、培养方案、学院制度、竞赛信息等任何问题
@@ -356,6 +371,7 @@ export default function ChatPage() {
           {messages.map((msg) => (
             <div
               key={msg.id}
+              className="chat-message"
               style={{
                 display: "flex",
                 gap: 12,
@@ -367,7 +383,7 @@ export default function ChatPage() {
                 icon={msg.role === "user" ? <UserOutlined /> : <RobotOutlined />}
                 style={{ background: msg.role === "user" ? "#1677ff" : "#52c41a" }}
               />
-              <div style={{ maxWidth: "78%" }}>
+              <div className="chat-message__content" style={{ maxWidth: "78%" }}>
               {/* 思考过程 */}
               {msg.thinkingContent && (
                 <div
@@ -430,6 +446,7 @@ export default function ChatPage() {
               )}
               {/* 回答气泡 */}
               <div
+                className="chat-bubble"
                 style={{
                   background: msg.role === "user" ? "#e6f4ff" : "#fff",
                   padding: "10px 14px",
@@ -475,7 +492,10 @@ export default function ChatPage() {
           </div>
         ))}
       </div>
-      <div style={{ paddingTop: 12, borderTop: "1px solid #f0f0f0" }}>
+      <div
+        className="chat-input-bar"
+        style={{ paddingTop: 12, borderTop: "1px solid #f0f0f0" }}
+      >
         <Space.Compact style={{ width: "100%" }}>
           <Input
             size="large"

@@ -146,12 +146,12 @@ export default function KnowledgePage() {
   };
 
   return (
-    <Card title="知识库（办事流程 / 规章制度）">
+    <Card className="knowledge-page" title="知识库（办事流程 / 规章制度）">
       <Space direction="vertical" style={{ width: "100%" }}>
         <Typography.Text type="secondary">
           输入关键词后，直接打开命中的原始资料文件。
         </Typography.Text>
-        <Space.Compact style={{ width: "100%" }}>
+        <Space.Compact className="knowledge-search" style={{ width: "100%" }}>
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -171,6 +171,7 @@ export default function KnowledgePage() {
           dataSource={result?.results ?? []}
           renderItem={(item) => (
             <List.Item
+              className="knowledge-result-item"
               key={item.resource_path ?? item.source}
               actions={
                 item.resource_path

@@ -14,6 +14,7 @@ from pydantic_ai.exceptions import AgentRunError
 from pydantic_ai.messages import ModelMessagesTypeAdapter, ModelResponse, ThinkingPart
 
 from app.agent.model_client import build_model
+from app.agent.playbook import build_playbook_instructions, get_playbook_store
 from app.agent.prompts import build_system_prompt
 from app.agent.tools import AgentDeps, register_tools
 from app.config import Settings, get_settings
@@ -55,6 +56,17 @@ def _event_result_type(event: dict) -> str:
     return "text" if result_type in _TEXT_ONLY_RESULT_TYPES else result_type
 
 
+def _match_playbook(message: str, deps: AgentDeps) -> str | None:
+    """用户消息命中操作手册时，返回本次对话要注入的动态指令；并累计命中统计。"""
+    store = get_playbook_store()
+    entry = store.match(message)
+    if entry is None:
+        return None
+    store.record_hit(entry)
+    deps.playbook = entry.title
+    return build_playbook_instructions(entry)
+
+
 def get_agent(settings: Settings | None = None) -> Agent:
     """获取全局 Agent 单例（懒加载，避免无密钥时导入失败）。"""
     global _AGENT
@@ -94,8 +106,14 @@ async def run_chat(
     settings = settings or get_settings()
     agent = get_agent(settings)
     history = _load_history(memory)
+    instructions = _match_playbook(message, deps)
     try:
-        result = await agent.run(message, deps=deps, message_history=history or None)
+        result = await agent.run(
+            message,
+            deps=deps,
+            message_history=history or None,
+            instructions=instructions,
+        )
     except AgentRunError as exc:
         raise ApiError(MODEL_ERROR, f"模型服务请求失败：{exc}", status_code=502) from exc
     except TimeoutError as exc:
@@ -126,6 +144,7 @@ async def run_chat(
         result_type=result_type,
         data=data,
         sources=sources,
+        playbook=deps.playbook,
         conversation_id=memory.conversation_id if memory else None,
     )
     await _save_turn(memory, message, result, response)
@@ -198,9 +217,13 @@ async def run_chat_stream(
     settings = settings or get_settings()
     agent = get_agent(settings)
     history = _load_history(memory)
+    instructions = _match_playbook(message, deps)
     try:
         async with agent.run_stream_events(
-            message, deps=deps, message_history=history or None
+            message,
+            deps=deps,
+            message_history=history or None,
+            instructions=instructions,
         ) as stream:
             async for ev in stream:
                 if isinstance(ev, PartDeltaEvent) and isinstance(ev.delta, ThinkingPartDelta):
@@ -236,6 +259,7 @@ async def run_chat_stream(
                         result_type=final_result_type,
                         data=data,
                         sources=sources,
+                        playbook=deps.playbook,
                         conversation_id=memory.conversation_id if memory else None,
                     )
                     await _save_turn(memory, message, ev.result, response)

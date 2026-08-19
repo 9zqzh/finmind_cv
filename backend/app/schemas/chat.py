@@ -36,6 +36,9 @@ class ChatResponse(BaseModel):
     result_type: ResultType = Field(default="text")
     data: Any = Field(default=None, description="结构化结果，供前端渲染卡片")
     sources: list[str] = Field(default_factory=list, description="知识来源")
+    playbook: str | None = Field(
+        default=None, description="本轮命中的操作手册标题，未命中为空"
+    )
     conversation_id: str | None = Field(
         default=None,
         description="数据库会话标识；后续请求携带它以继续多轮对话",

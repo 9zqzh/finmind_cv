@@ -53,6 +53,8 @@ class AgentDeps:
     last_result_type: str = "text"
     last_data: Any = None
     sources: list[str] = field(default_factory=list)
+    # 本轮命中的操作手册标题（未命中为 None）
+    playbook: str | None = None
 
 
 def _record_success(ctx: RunContext[AgentDeps], tool: str, data: Any) -> None:

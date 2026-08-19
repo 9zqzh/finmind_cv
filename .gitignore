@@ -12,6 +12,7 @@ __pycache__/
 *$py.class
 *.egg-info/
 backend/data/chroma/
+backend/data/last_evolution_run.txt
 build/
 dist/
 .pytest_cache/

@@ -9,6 +9,7 @@ import AcademicInfoPage from "./pages/AcademicInfoPage";
 import KnowledgePage from "./pages/KnowledgePage";
 import CompetitionPage from "./pages/CompetitionPage";
 import InformationPage from "./pages/InformationPage";
+import AdminPage from "./pages/AdminPage";
 import { preloadCompetitionData } from "./stores/competitionStore";
 import { preloadInformationData } from "./stores/informationStore";
 
@@ -35,6 +36,8 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          {/* 管理台独立于学生登录体系，通过 ADMIN_TOKEN 鉴权 */}
+          <Route path="/admin" element={<AdminPage />} />
           <Route element={<ProtectedLayout />}>
             <Route path="/" element={<ChatPage />} />
             <Route path="/academic-info" element={<AcademicInfoPage />} />

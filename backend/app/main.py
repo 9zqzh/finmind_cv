@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.api import auth, chat, competitions, conversations, information, jwxt, knowledge, playbooks, resources
+from app.agent.evolution_scheduler import start_scheduler, stop_scheduler
 from app.config import get_settings
 from app.db import build_engine, build_session_factory
 from app.knowledge import KnowledgeService
@@ -51,9 +52,12 @@ async def lifespan(app: FastAPI):
     app.state.information = KnowledgeService.from_directory(
         BASE_DIR / settings.information_dir
     )
+    # 定时自进化后台任务（产出草稿，仍需管理员审核）
+    app.state.evolution_task = start_scheduler(sessions)
     try:
         yield
     finally:
+        await stop_scheduler(app.state.evolution_task)
         await app.state.sessions.close()
         await engine.dispose()
 

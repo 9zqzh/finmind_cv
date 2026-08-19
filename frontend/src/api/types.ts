@@ -173,3 +173,39 @@ export interface ResourceTree {
   directories: ResourceDirectory[];
   files: ResourceFile[];
 }
+
+// ---- 操作手册管理（自进化审核） ----
+
+export interface AdminPlaybookEntry {
+  id: string;
+  title: string;
+  keywords: string[];
+  source: "manual" | "auto" | string;
+  instructions: string;
+}
+
+export interface AdminPlaybookList {
+  entries: AdminPlaybookEntry[];
+  hit_stats: Record<string, number>;
+}
+
+export interface AdminDraft {
+  id: string;
+  title: string;
+  keywords: string[];
+  cluster_count: number;
+  warnings: string;
+  instructions: string;
+}
+
+export interface AdminEvolveDraft {
+  id: string | null;
+  title: string;
+  warnings?: string[];
+  error?: string;
+}
+
+export interface AdminEvolveResult {
+  clusters_found: number;
+  drafts: AdminEvolveDraft[];
+}

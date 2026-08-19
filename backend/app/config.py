@@ -87,6 +87,12 @@ class Settings(BaseSettings):
     evolution_top_n: int = Field(default=3, alias="EVOLUTION_TOP_N")
     evolution_cooldown_days: int = Field(default=14, alias="EVOLUTION_COOLDOWN_DAYS")
     evolution_sample_size: int = Field(default=6, alias="EVOLUTION_SAMPLE_SIZE")
+    # 定时自进化：开关、执行间隔天数与本地时间小时（草稿仍需人工审核）
+    evolution_schedule_enabled: bool = Field(
+        default=True, alias="EVOLUTION_SCHEDULE_ENABLED"
+    )
+    evolution_interval_days: int = Field(default=7, alias="EVOLUTION_INTERVAL_DAYS")
+    evolution_run_hour: int = Field(default=3, alias="EVOLUTION_RUN_HOUR")
     # 管理接口令牌；留空表示不校验（仅限原型阶段，生产必须配置）
     admin_token: str = Field(default="", alias="ADMIN_TOKEN")
     # 原始资料文件目录（相对 backend 目录，默认为项目根下的 resources）

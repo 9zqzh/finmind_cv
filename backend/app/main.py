@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
-from app.api import auth, chat, competitions, conversations, information, jwxt, knowledge, resources
+from app.api import auth, chat, competitions, conversations, information, jwxt, knowledge, playbooks, resources
 from app.config import get_settings
 from app.db import build_engine, build_session_factory
 from app.knowledge import KnowledgeService
@@ -81,6 +81,7 @@ app.include_router(competitions.router)
 app.include_router(information.router)
 app.include_router(jwxt.router)
 app.include_router(knowledge.router)
+app.include_router(playbooks.router)
 app.include_router(resources.router)
 
 

@@ -78,6 +78,17 @@ class Settings(BaseSettings):
     information_dir: str = Field(default="data/information", alias="INFORMATION_DIR")
     # 操作手册（关键词触发的固定最优路径）条目目录
     playbook_dir: str = Field(default="data/playbooks", alias="PLAYBOOK_DIR")
+    # 操作手册自进化：自动生成的草稿目录与高频判定参数
+    playbook_draft_dir: str = Field(
+        default="data/playbook_drafts", alias="PLAYBOOK_DRAFT_DIR"
+    )
+    evolution_min_count: int = Field(default=8, alias="EVOLUTION_MIN_COUNT")
+    evolution_window_days: int = Field(default=7, alias="EVOLUTION_WINDOW_DAYS")
+    evolution_top_n: int = Field(default=3, alias="EVOLUTION_TOP_N")
+    evolution_cooldown_days: int = Field(default=14, alias="EVOLUTION_COOLDOWN_DAYS")
+    evolution_sample_size: int = Field(default=6, alias="EVOLUTION_SAMPLE_SIZE")
+    # 管理接口令牌；留空表示不校验（仅限原型阶段，生产必须配置）
+    admin_token: str = Field(default="", alias="ADMIN_TOKEN")
     # 原始资料文件目录（相对 backend 目录，默认为项目根下的 resources）
     resources_dir: str = Field(default="../resources", alias="RESOURCES_DIR")
 

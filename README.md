@@ -1,216 +1,139 @@
 # 学院教学小助手
 
-面向广东金融学院学生的教学信息助手。项目将教务系统查询、学院官网公开信息检索、学术资源搜索（arXiv/Semantic Scholar）、学院制度与资料检索，以及基于大模型的自然语言对话整合到一个 Web 应用中：学生既可以通过页面查询课表和成绩，也可以在对话中用自然语言提问，系统自动选择工具并以结构化卡片展示结果。支持多轮对话记忆与流式输出。
+面向广东金融学院学生的教学信息助手，整合教务查询、学院官网与竞赛信息、学术资源搜索、本地知识库以及基于 PydanticAI 的自然语言对话。系统包含 React 前端、FastAPI 后端、PostgreSQL 持久化，并可选接入 Chroma 向量检索。
 
-## 功能概览
+## 项目结构
 
-- **教务登录**：获取验证码、使用学号和密码登录、查询登录状态与退出登录。
-- **个人教学信息**：查询个人课表、成绩及成绩明细、专业培养方案。
-- **教室查询**：按学期、校区、教学楼和教学周查看教室占用课表；支持查询空闲教室。
-- **官网信息搜索**：关键词搜索学院官网公开内容（新闻、通知、师资、专业介绍等），实时来自学院官网。
-- **竞赛讯息查询**：实时查询学院竞赛平台的比赛列表与详情（分类、报名状态、时间线、附件等），支持按年份/状态/分类/学院/关键词筛选；并可查询竞赛平台通知公告与竞赛社团。
-- **学术资源搜索**：从 arXiv、Semantic Scholar 等开放学术平台检索论文与文献，返回标题、作者、摘要、页面链接与 PDF 下载地址。
-- **AI 对话**：由 PydanticAI 驱动，按问题自动选择工具（14 个工具），将结果以结构化卡片展示；支持多轮对话记忆与 SSE 流式输出。
-- **知识与资讯检索**：检索本地 Markdown、文本和 JSON 资料，结果附带来源。
-
-## 架构
-
-```mermaid
-flowchart LR
-  UI["React + Vite + Ant Design"] -->|"/api"| API["FastAPI"]
-  API --> Agent["PydanticAI Agent"]
-  API --> Adapter["教务适配层"]
-  API --> WebAdapter["官网适配层"]
-  API --> AcademicAdapter["学术资源适配层"]
-  Agent --> Adapter
-  Agent --> WebAdapter
-  Agent --> AcademicAdapter
-  Agent --> Search["轻量知识检索"]
-  Adapter --> JWXT["广东金融学院教务系统"]
-  WebAdapter --> WEB["学院官网 (gduf-web-api)"]
-  AcademicAdapter --> ACADEMIC["学术平台 (gduf-academic-api)"]
-  Search --> Data["本地知识库与资讯资料"]
-  Agent --> LLM["DeepSeek（OpenAI 兼容接口）"]
+```text
+.
+├── frontend/                   # React + Vite 前端
+├── backend/                    # FastAPI、Agent、迁移、数据与测试
+├── packages/gduf-academic-api/ # 学术资源聚合客户端
+├── scripts/                    # 资料转换等维护脚本
+├── resources/                  # 可浏览、下载的原始资料
+├── docs/                       # 需求、架构和开发文档
+├── compose.yaml                # 完整容器编排
+└── .env.example                # 统一配置模板
 ```
 
-项目由三个主工程和两个 PyPI 客户端依赖组成：
+## Docker 一键启动
 
-| 目录 | 职责 | 核心技术 |
-| --- | --- | --- |
-| `front_end/web` | 浏览器界面、登录状态与结构化结果展示 | React 18、TypeScript、Vite、Ant Design、Axios |
-| `back_end/backend` | API、会话管理、Agent 编排、知识检索 | Python 3.10+、FastAPI、PydanticAI、Pydantic Settings |
-| `back_end/gduf-academic-api` | 学术资源平台聚合检索（arXiv、Semantic Scholar 等） | httpx |
+### 1. 首次安全初始化
 
-后端通过 PyPI 依赖 [`gduf-jwxt-api`](https://pypi.org/project/gduf-jwxt-api/) 和 [`gduf-web-api`](https://pypi.org/project/gduf-web-api/) 分别访问教务系统、学院官网与竞赛平台；源码由各自的上游仓库独立维护。
-
-## 快速开始
-
-### 前置条件
-
-- Python 3.10 或更高版本
-- Node.js 与 npm
-- PostgreSQL 14 或更高版本（可使用项目提供的 Docker Compose）
-- 可访问广东金融学院教务系统
-- DeepSeek API Key（仅 AI 对话功能需要）
-
-### 1. 启动后端
-
-在 PowerShell 中执行：
+需要 Docker Desktop（或其他支持 Compose v2 的 Docker 环境）。在项目根目录执行：
 
 ```powershell
-cd back_end\backend
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -e ".[test]"
-python -m pip install -e ..\gduf-academic-api
 Copy-Item .env.example .env
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-启动 PostgreSQL：
+打开 `.env`：
+
+- 为 `POSTGRES_PASSWORD` 设置仅包含 URL 安全字符的强密码；
+- 将上一条命令生成的值填入 `SESSION_ENCRYPTION_KEYS`；
+- 需要 AI 对话时填写 `DEEPSEEK_API_KEY`，其余功能不依赖该密钥。
+
+真实 `.env` 已被 Git 与 Docker 构建上下文忽略，禁止提交。如果从旧目录升级，请把原 `back_end/backend/.env` 中仍需使用的配置复制到根目录 `.env`。
+
+### 2. 启动完整应用
 
 ```powershell
-docker compose -f docker-compose.postgres.yml up -d
+docker compose up --build -d
 ```
 
-打开 `back_end/backend/.env`，至少填写有效的 `DEEPSEEK_API_KEY`：
+等待健康检查完成后访问：
 
-```dotenv
-DEEPSEEK_API_KEY=你的密钥
-DEEPSEEK_BASE_URL=https://api.deepseek.com
-DEEPSEEK_MODEL=deepseek-v4-flash
-```
+- Web 应用：<http://localhost:8080>
+- API 文档：<http://localhost:8080/docs>
+- 存活检查：<http://localhost:8080/healthz>
 
-知识库默认支持两种模式：不配置嵌入服务时使用关键词检索；配置 Chroma 和百炼嵌入服务后自动使用向量检索。团队成员请优先阅读[团队本地运行与向量检索指南](docs/团队本地运行与向量检索指南.md)。
+可在 `.env` 中修改 `APP_PORT`，例如 `APP_PORT=9000`。PostgreSQL 和后端默认只在 Compose 内部网络开放，不占用宿主机端口。
 
-启动服务（自动执行 Alembic 数据库迁移）：
+常用维护命令：
 
 ```powershell
-python -m app.start --reload --port 8000
+docker compose ps
+docker compose logs -f backend
+docker compose down
+docker compose down -v  # 同时删除数据库和 Chroma 数据，请谨慎使用
 ```
 
-后端健康检查地址为 <http://127.0.0.1:8000/>，交互式 API 文档为 <http://127.0.0.1:8000/docs>。
+### 3. 可选向量检索
 
-### 2. 启动前端
-
-另开一个终端：
+默认不启动 Chroma，知识库使用关键词检索。先在 `.env` 中配置 `EMBEDDING_BASE_URL`、`EMBEDDING_API_KEY` 和 `EMBEDDING_MODEL`，再执行：
 
 ```powershell
-cd front_end\web
+docker compose --profile vector up --build -d
+```
+
+后端会通过 Compose 服务名 `chroma:8000` 连接向量数据库；未启动 Profile 或嵌入配置不完整时会自动回退到关键词检索。
+
+## 非 Docker 本地开发
+
+### 后端
+
+```powershell
+python -m venv backend\.venv
+backend\.venv\Scripts\python -m pip install --upgrade pip
+backend\.venv\Scripts\python -m pip install -e ".\backend[test]"
+backend\.venv\Scripts\python -m pip install -e .\packages\gduf-academic-api
+cd backend
+.venv\Scripts\python -m app.start --reload --port 8000
+```
+
+根目录 `.env` 同样适用于本地后端。本地模式需要可从宿主机访问的 PostgreSQL，并将 `DATABASE_URL` 指向它；更推荐直接使用完整 Docker 编排。后端启动器会先执行 Alembic 迁移，再启动 Uvicorn。
+
+### 前端
+
+```powershell
+cd frontend
 npm ci
 npm run dev
 ```
 
-访问 <http://127.0.0.1:5173>。开发服务器会将 `/api` 代理到后端的 `http://127.0.0.1:8000`。
+访问 <http://localhost:5173>。Vite 会把 `/api` 代理到 `http://127.0.0.1:8000`。
 
-### 3. 使用流程
+## 配置说明
 
-1. 打开前端，先获取验证码。
-2. 输入教务系统的学号、密码和验证码完成登录。
-3. 通过侧边栏进入课表、成绩、培养方案、教室课表或知识检索页面；也可以在首页发起对话。
+配置集中在根目录 `.env`，完整字段见 [`.env.example`](.env.example)。主要变量：
 
-## 配置项
-
-后端从 `back_end/backend/.env` 读取配置，完整模板见 [`.env.example`](back_end/backend/.env.example)。
-
-| 环境变量 | 默认值 | 说明 |
-| --- | --- | --- |
-| `DEEPSEEK_API_KEY` | 空 | DeepSeek 密钥；未配置时 AI 对话不可用 |
-| `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | OpenAI 兼容接口地址 |
-| `DEEPSEEK_MODEL` | `deepseek-v4-flash` | 对话模型名称 |
-| `DEEPSEEK_EXTRA_BODY` | `{}` | 合并到模型请求体的额外 JSON 参数，如思考模式与强度 |
-| `AGENT_MAX_ITERATIONS` | `4` | Agent 最大工具调用轮次（当前作为配置保留） |
-| `AGENT_TIMEOUT_SECONDS` | `30` | Agent 超时配置（当前由模型客户端请求超时控制） |
-| `JWXT_BASE_URL` | `https://jwxt.gduf.edu.cn` | 教务系统根地址 |
-| `ACADEMIC_PROXY` | 空 | 学术资源平台代理地址（如 `http://127.0.0.1:7890`），留空直连 |
-| `SESSION_TTL_MINUTES` | `120` | 验证码阶段内存会话的空闲过期时间（分钟） |
-| `LOGIN_SESSION_TTL_DAYS` | `7` | 已登录会话的滚动过期天数 |
-| `DATABASE_URL` | 空 | PostgreSQL 异步连接地址，必须配置 |
-| `SESSION_ENCRYPTION_KEYS` | 空 | Fernet 密钥列表（新密钥在前），必须配置 |
-| `KNOWLEDGE_DIR` | `data/knowledge` | 知识库资料目录 |
-| `INFORMATION_DIR` | `data/information` | 学院资讯与竞赛资料目录 |
-
-请勿提交 `.env`，仓库已通过 `.gitignore` 忽略该文件。
-
-## API 摘要
-
-所有接口使用统一响应封装：
-
-```json
-{"success": true, "data": {}, "message": null}
-```
-
-失败响应会额外包含 `code`，例如 `AUTH_REQUIRED`、`AUTH_FAILED`、`SESSION_EXPIRED`、`MODEL_ERROR`。
-
-| 方法 | 路径 | 登录要求 | 用途 |
-| --- | --- | --- | --- |
-| `POST` | `/api/auth/captcha` | 否 | 创建会话并获取验证码图片（Base64） |
-| `POST` | `/api/auth/login` | 否 | 使用验证码登录教务系统 |
-| `POST` | `/api/auth/logout` | 可选 | 退出并清除会话 |
-| `GET` | `/api/auth/status` | 可选 | 查询登录状态 |
-| `POST` | `/api/chat` | 可选 | AI 对话；个人教务数据须先登录；支持多轮对话记忆 |
-| `POST` | `/api/chat/stream` | 可选 | AI 对话（SSE 流式）；逐步推送思考、工具调用与回答 |
-| `GET` | `/api/schedule` | 是 | 查询个人课表 |
-| `GET` | `/api/classroom-buildings` | 是 | 获取教学楼列表（按校区） |
-| `GET` | `/api/classroom-schedule` | 是 | 查询教室课表 |
-| `GET` | `/api/grades` | 是 | 查询成绩与学分/绩点统计 |
-| `GET` | `/api/grades/{index}/detail` | 是 | 查询单科成绩构成 |
-| `GET` | `/api/training-plan` | 是 | 查询培养方案 |
-| `GET` | `/api/knowledge/search` | 否 | 检索知识库 |
-| `GET` | `/api/knowledge/resources` | 否 | 浏览资料文件目录树 |
-| `GET` | `/api/knowledge/resources/file` | 否 | 下载/预览资料文件 |
-| `GET` | `/api/information/search` | 否 | 检索学院资讯和竞赛信息 |
-
-除 `POST /api/chat` 可以在请求体中提供 `session_token` 外，已登录接口通过请求头传递会话：
-
-```http
-X-Session-Token: <session_token>
-```
-
-## 数据与安全说明
-
-- 后端为每位用户创建独立的 `JwxtClient`；登录 Cookie 经 Fernet 加密后保存到 PostgreSQL，服务重启后会向教务系统验证并恢复。
-- 聊天必须登录；完整历史保存到 PostgreSQL，模型上下文只加载最近 4 组问答。
-- 验证码与教务系统的 `JSESSIONID` 绑定，获取验证码与登录必须使用同一会话。
-- 项目仅持久化学号作为用户标识，不保存教务密码或验证码；前端将随机会话令牌保存在 `localStorage`，数据库只保存其 SHA-256 摘要。
-- Agent 通过 14 个工具获取真实数据（教务查询、官网搜索、竞赛讯息、学术资源搜索、知识库检索等），避免直接编造；未登录时会返回相应提示。
-- 当前 CORS 为开发方便配置为允许全部来源，部署前应收紧 `allow_origins` 并妥善管理数据库凭据与 Cookie 加密密钥。
+| 变量 | 用途 |
+| --- | --- |
+| `APP_PORT` | Nginx 对外端口，默认 `8080` |
+| `POSTGRES_DB/USER/PASSWORD` | Compose PostgreSQL 配置 |
+| `SESSION_ENCRYPTION_KEYS` | 登录 Cookie 的 Fernet 加密密钥，必填 |
+| `DEEPSEEK_*` | OpenAI 兼容模型配置 |
+| `EMBEDDING_*` | 向量嵌入服务配置 |
+| `KNOWLEDGE_RETRIEVAL_MODE` | `auto` 或 `keyword` |
+| `ACADEMIC_PROXY` | arXiv、Semantic Scholar 等平台的可选代理 |
 
 ## 测试与构建
 
-后端测试覆盖 API 基础行为、知识检索、Agent 工具注册、教务与官网适配层、空闲教室过滤、纯文本降级、对话记忆等。运行：
-
 ```powershell
-# 后端服务测试（50 个用例）
-cd back_end\backend
-.\.venv\Scripts\python -m pytest
+# 后端
+backend\.venv\Scripts\python -m pytest backend\tests
 
-# 学术资源客户端测试
-cd ..\gduf-academic-api
-..\backend\.venv\Scripts\python -m pytest -o addopts=""
+# 内部学术包
+backend\.venv\Scripts\python -m pytest packages\gduf-academic-api\tests -o addopts=""
 
-# 前端类型检查与生产构建
-cd ..\..\front_end\web
+# 前端
+cd frontend
+npm test
 npm run build
 ```
 
-主后端通过桩对象测试教务与官网客户端适配层，不需要真实学号、密码或上游网络访问。两个 PyPI 客户端自身的解析测试和 fixture 由上游仓库维护。学术资源客户端测试使用 MockTransport 模拟 arXiv XML 与 Semantic Scholar JSON 响应。
+## 数据与安全
 
-## 资料维护与当前限制
-
-- `back_end/backend/data/knowledge/` 存放制度、培养方案等 Markdown 资料；`data/information/` 存放学院资讯和竞赛信息。项目根目录 `resources/` 存放原始 PDF/docx 资料文件，可通过 API 浏览目录树与下载/预览。
-- 知识库支持 Chroma 向量检索与关键词兜底；未配置 Docker 或嵌入密钥时仍可正常使用关键词检索。资料仍需人工更新。
-- 学院资讯目前为本地静态示例数据；学院官网公开内容已通过 `gduf-web-api` 实现实时搜索（`search_website` 工具）；竞赛平台公开信息已通过 `gduf-web-api` 实时接入（`query_competitions`/`query_competition_detail`/`query_competition_notices`/`query_competition_clubs` 工具）。
-- AI 对话必须成功配置并能访问模型服务；教务功能还受学校系统可用性影响。
+- `backend/data/knowledge/` 与 `backend/data/information/` 是可检索的结构化资料；`resources/` 保存原始 PDF、Word、Excel 等文件。
+- 教务密码和验证码不会持久化；登录 Cookie 加密后存入 PostgreSQL，数据库中只保存会话令牌摘要。
+- 前端和 API 通过 Nginx 同源访问；SSE 流式对话已关闭代理缓冲。
+- `docker compose down` 不删除命名卷；只有显式添加 `-v` 才会删除持久化数据。
 
 ## 进一步阅读
 
-- [后端说明](back_end/backend/README.md)
-- [教务客户端 API 说明](https://github.com/LiangJZ1/gduf-jwxt-api)
-- [官网客户端说明](https://github.com/LiangJZ1/gduf-web-api)
-- [学术资源客户端说明](back_end/gduf-academic-api/README.md)
-- [业务功能说明](docs/业务功能说明.md)
-- [技术栈说明](docs/技术栈说明.md)
+- [后端说明](backend/README.md)
 - [项目结构说明](docs/项目结构说明.md)
-- [后端后续开发操作指南](docs/后端后续开发操作指南.md)
+- [技术栈说明](docs/技术栈说明.md)
+- [业务功能说明](docs/业务功能说明.md)
 - [团队本地运行与向量检索指南](docs/团队本地运行与向量检索指南.md)
+- [学术资源客户端说明](packages/gduf-academic-api/README.md)

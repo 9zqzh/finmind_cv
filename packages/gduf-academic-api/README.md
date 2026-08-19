@@ -4,11 +4,10 @@
 
 ## 安装
 
-在 backend 虚拟环境中以可编辑模式安装：
+在项目根目录使用 backend 虚拟环境以可编辑模式安装：
 
 ```powershell
-cd back_end\backend
-.\.venv\Scripts\python -m pip install -e ../gduf-academic-api
+backend\.venv\Scripts\python -m pip install -e .\packages\gduf-academic-api
 ```
 
 ## 用法

@@ -1,0 +1,81 @@
+name: finmind
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "${APP_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_ENV: production
+      DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER:-finmind}:${POSTGRES_PASSWORD:?请在 .env 中设置 POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-finmind}"
+      SESSION_ENCRYPTION_KEYS: "${SESSION_ENCRYPTION_KEYS:?请在 .env 中设置 SESSION_ENCRYPTION_KEYS}"
+      RESOURCES_DIR: /app/resources
+      CHROMA_HOST: "${CHROMA_HOST:-chroma}"
+      CHROMA_PORT: 8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=5)"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-finmind}"
+      POSTGRES_USER: "${POSTGRES_USER:-finmind}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?请在 .env 中设置 POSTGRES_PASSWORD}"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-finmind} -d ${POSTGRES_DB:-finmind}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
+  chroma:
+    image: chromadb/chroma:1.5.9
+    profiles: ["vector"]
+    environment:
+      IS_PERSISTENT: "TRUE"
+      ANONYMIZED_TELEMETRY: "FALSE"
+      PERSIST_DIRECTORY: /data
+    ports:
+      - "${CHROMA_HOST_PORT:-8001}:8000"
+    volumes:
+      - chroma-data:/data
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  chroma-data:

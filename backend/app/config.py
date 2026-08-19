@@ -14,7 +14,8 @@ class Settings(BaseSettings):
     """集中管理环境变量配置，禁止在代码中硬编码密钥。"""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # 根目录 .env 是统一配置；backend/.env 仅作为旧版兼容来源。
+        env_file=(".env", "../.env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -76,7 +77,7 @@ class Settings(BaseSettings):
     knowledge_dir: str = Field(default="data/knowledge", alias="KNOWLEDGE_DIR")
     information_dir: str = Field(default="data/information", alias="INFORMATION_DIR")
     # 原始资料文件目录（相对 backend 目录，默认为项目根下的 resources）
-    resources_dir: str = Field(default="../../resources", alias="RESOURCES_DIR")
+    resources_dir: str = Field(default="../resources", alias="RESOURCES_DIR")
 
     @property
     def model_configured(self) -> bool:

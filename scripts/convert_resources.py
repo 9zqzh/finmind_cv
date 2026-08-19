@@ -1,7 +1,7 @@
 r"""一次性脚本：把 resources/ 下的 PDF/docx/doc/xlsx 转成 Markdown 并分类放入知识库目录。
 
-用法（在 backend 目录下）：
-    .venv\Scripts\python _convert_resources.py
+用法（在项目根目录下）：
+    backend\.venv\Scripts\python scripts\convert_resources.py
 
 支持的格式：
 - .pdf  → pypdf 提取文本
@@ -22,9 +22,9 @@ from docx import Document
 from openpyxl import load_workbook
 from pypdf import PdfReader
 
-ROOT = Path(__file__).resolve().parent.parent.parent  # 项目根目录
+ROOT = Path(__file__).resolve().parent.parent  # 项目根目录
 RESOURCES = ROOT / "resources"
-KNOWLEDGE = Path(__file__).resolve().parent / "data" / "knowledge"
+KNOWLEDGE = ROOT / "backend" / "data" / "knowledge"
 
 # 关键词检索依赖原词命中：为文档补充用户常用的同义问法，提高命中率
 ALIASES: dict[str, list[str]] = {

@@ -6,7 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { api, getToken, setToken } from "../api/client";
+import { api, getToken, onAuthExpired, setToken } from "../api/client";
 
 interface AuthState {
   loggedIn: boolean;
@@ -31,9 +31,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // 页面刷新时若本地有 token，向后端确认登录状态
   useEffect(() => {
+    const unsubscribe = onAuthExpired(() => {
+      setLoggedIn(false);
+      setUsername(null);
+      setLoading(false);
+    });
     if (!getToken()) {
       setLoading(false);
-      return;
+      return unsubscribe;
     }
     api
       .authStatus()
@@ -44,8 +49,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setToken(null);
         }
       })
-      .catch(() => setToken(null))
+      .catch(() => {
+        setToken(null);
+        setLoggedIn(false);
+        setUsername(null);
+      })
       .finally(() => setLoading(false));
+    return unsubscribe;
   }, []);
 
   const markLoggedIn = useCallback((name: string) => {

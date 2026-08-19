@@ -16,6 +16,8 @@ import type {
 } from "./types";
 
 const TOKEN_KEY = "session_token";
+const AUTH_EXPIRED_CODES = new Set(["AUTH_REQUIRED", "SESSION_EXPIRED"]);
+const authExpiredListeners = new Set<() => void>();
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -27,6 +29,24 @@ export function setToken(token: string | null) {
   } else {
     localStorage.removeItem(TOKEN_KEY);
   }
+}
+
+/** 订阅登录会话失效；用于让路由立即刷新认证状态。 */
+export function onAuthExpired(listener: () => void) {
+  authExpiredListeners.add(listener);
+  return () => {
+    authExpiredListeners.delete(listener);
+  };
+}
+
+/** 统一处理普通请求与流式请求返回的会话失效错误。 */
+export function handleAuthExpired(code: string | undefined): boolean {
+  if (!code || !AUTH_EXPIRED_CODES.has(code) || !getToken()) {
+    return false;
+  }
+  setToken(null);
+  authExpiredListeners.forEach((listener) => listener());
+  return true;
 }
 
 /** 业务错误：后端返回 success=false 或 HTTP 错误时抛出 */
@@ -55,6 +75,7 @@ client.interceptors.response.use(
   (response) => {
     const body = response.data as ApiEnvelope<unknown>;
     if (body && body.success === false) {
+      handleAuthExpired(body.code);
       throw new ApiBizError(body.code ?? "UNKNOWN", body.message ?? "请求失败");
     }
     return response;
@@ -62,6 +83,7 @@ client.interceptors.response.use(
   (error) => {
     const body = error.response?.data as ApiEnvelope<unknown> | undefined;
     if (body?.code) {
+      handleAuthExpired(body.code);
       throw new ApiBizError(body.code, body.message ?? "请求失败");
     }
     if (error.code === "ECONNABORTED") {

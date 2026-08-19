@@ -28,7 +28,7 @@ import {
 } from "@ant-design/icons";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { api, getToken } from "../api/client";
+import { api, ApiBizError, getToken, handleAuthExpired } from "../api/client";
 import type { ChatData, ConversationSummary, StoredTurn } from "../api/types";
 import {
   applyStreamSnapshot,
@@ -364,8 +364,21 @@ export default function ChatPage() {
         }),
       });
 
-      if (!response.ok || !response.body) {
-        throw new Error("请求失败");
+      if (!response.ok) {
+        let code: string | undefined;
+        let message = "请求失败";
+        try {
+          const body = await response.json();
+          code = typeof body?.code === "string" ? body.code : undefined;
+          message = typeof body?.message === "string" ? body.message : message;
+        } catch {
+          // 非 JSON 错误仍使用通用提示。
+        }
+        handleAuthExpired(code);
+        throw new ApiBizError(code ?? "UNKNOWN", message);
+      }
+      if (!response.body) {
+        throw new ApiBizError("EMPTY_RESPONSE", "服务器未返回对话内容");
       }
 
       const reader = response.body.getReader();

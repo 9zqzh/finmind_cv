@@ -73,6 +73,8 @@ jobs:
             dockerfile: frontend/Dockerfile
           - component: backend
             dockerfile: backend/Dockerfile
+          - component: postgres
+            dockerfile: deploy/postgres.Dockerfile
 
     steps:
       - name: Check out release
@@ -147,4 +149,4 @@ jobs:
         run: |
           ssh -p "${{ secrets.SSH_PORT }}" \
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "set -e; mkdir -p ~/finmind; mv ~/compose.prod.yaml ~/finmind/compose.prod.yaml; cd ~/finmind; test -f .env || { echo 'Missing ~/finmind/.env' >&2; exit 1; }; IMAGE_TAG=${{ github.sha }} docker compose --env-file .env -f compose.prod.yaml pull; IMAGE_TAG=${{ github.sha }} docker compose --env-file .env -f compose.prod.yaml up -d --remove-orphans"
+            "set -e; mkdir -p ~/finmind; mv ~/compose.prod.yaml ~/finmind/compose.prod.yaml; cd ~/finmind; test -f .env || { echo 'Missing ~/finmind/.env' >&2; exit 1; }; IMAGE_TAG=${{ github.sha }} docker compose --env-file .env -f compose.prod.yaml pull; IMAGE_TAG=${{ github.sha }} docker compose --env-file .env -f compose.prod.yaml up -d --remove-orphans; IMAGE_TAG=${{ github.sha }} docker compose --env-file .env -f compose.prod.yaml exec -T frontend wget -qO- http://127.0.0.1/healthz"

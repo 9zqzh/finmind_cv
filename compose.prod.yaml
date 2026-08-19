@@ -4,7 +4,7 @@ services:
   frontend:
     image: "${ACR_PULL_REGISTRY:?请在服务器 .env 中设置 ACR_PULL_REGISTRY}/liangjz1/finmind:frontend-${IMAGE_TAG:-latest}"
     ports:
-      - "${APP_PORT:-8080}:80"
+      - "127.0.0.1:${APP_PORT:-8080}:80"
     depends_on:
       backend:
         condition: service_healthy

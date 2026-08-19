@@ -141,10 +141,10 @@ jobs:
         run: |
           scp -P "${{ secrets.SSH_PORT }}" \
             compose.prod.yaml \
-            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/opt/finmind/compose.prod.yaml"
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/compose.prod.yaml"
 
       - name: Pull images and restart services
         run: |
           ssh -p "${{ secrets.SSH_PORT }}" \
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "cd /opt/finmind && IMAGE_TAG=${{ github.sha }} docker compose --env-file .env -f compose.prod.yaml pull && IMAGE_TAG=${{ github.sha }} docker compose --env-file .env -f compose.prod.yaml up -d --remove-orphans"
+            "sudo -n install -m 0644 ~/compose.prod.yaml /opt/finmind/compose.prod.yaml && rm ~/compose.prod.yaml && cd /opt/finmind && IMAGE_TAG=${{ github.sha }} docker compose --env-file .env -f compose.prod.yaml pull && IMAGE_TAG=${{ github.sha }} docker compose --env-file .env -f compose.prod.yaml up -d --remove-orphans"

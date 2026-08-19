@@ -106,6 +106,9 @@ jobs:
           context: .
           file: ${{ matrix.dockerfile }}
           push: true
+          # ACR 个人版当前不接受 BuildKit provenance/SBOM 附加清单。
+          provenance: false
+          sbom: false
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.component }}

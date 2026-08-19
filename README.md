@@ -77,7 +77,7 @@ docker compose --profile vector up --build -d
 3. 使用发行标签、提交 SHA 和 `latest` 分别标记镜像；
 4. 通过 SSH 上传 `compose.prod.yaml`，并让服务器拉取本次发行提交对应的镜像。
 
-服务器需要预先创建 `/opt/finmind/.env`，其中包含普通运行配置以及镜像拉取地址：
+服务器需要预先创建 `~/finmind/.env`，其中包含普通运行配置以及镜像拉取地址：
 
 ```dotenv
 # 广州同 VPC 的阿里云 ECS 使用专有网络地址；其他服务器使用公网地址。

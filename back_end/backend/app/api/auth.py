@@ -5,7 +5,10 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request
 
 from app.adapters import jwxt as jwxt_adapter
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.api.deps import get_optional_session, get_session_manager
+from app.db import get_db
 from app.schemas.common import AUTH_REQUIRED, ApiError, ok
 from app.schemas.requests import LoginRequest
 from app.services.session import JwxtSession, SessionManager
@@ -29,9 +32,10 @@ async def get_captcha(manager: SessionManager = Depends(get_session_manager)):
 async def login(
     payload: LoginRequest,
     manager: SessionManager = Depends(get_session_manager),
+    db: AsyncSession = Depends(get_db),
 ):
     """使用学号、密码、验证码登录教务系统。"""
-    session = manager.get(payload.session_token)
+    session = await manager.get(payload.session_token, db)
     if session is None:
         raise ApiError(
             AUTH_REQUIRED,
@@ -41,6 +45,7 @@ async def login(
     data = await jwxt_adapter.login(
         session, payload.username, payload.password, payload.captcha
     )
+    await manager.persist_login(session, db)
     return ok({"session_token": session.token, **data})
 
 
@@ -48,12 +53,13 @@ async def login(
 async def logout(
     request: Request,
     session: JwxtSession | None = Depends(get_optional_session),
+    db: AsyncSession = Depends(get_db),
 ):
     """退出登录并销毁会话。"""
     if session is not None:
         if session.is_logged_in:
             await jwxt_adapter.logout(session)
-        get_session_manager(request).remove(session.token)
+        await get_session_manager(request).remove(session.token, db)
     return ok({"logged_out": True})
 
 

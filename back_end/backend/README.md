@@ -12,7 +12,7 @@ backend/
     schemas/                # 统一响应结构、错误码、请求/响应模型
     api/                    # HTTP 路由：auth / chat / jwxt / knowledge
     services/
-      session.py            # 内存会话管理（token -> JwxtClient，TTL 过期）
+      session.py            # PostgreSQL 登录会话 + JwxtClient 进程缓存
     adapters/
       jwxt.py               # gduf-jwxt-api 适配层（异常映射、async 包装）
     agent/
@@ -41,14 +41,16 @@ python -m venv .venv                       # 已创建可跳过
 
 ## 配置
 
-复制 `.env.example` 为 `.env` 并填写 `DEEPSEEK_API_KEY`。未配置嵌入服务时知识库自动使用关键词检索；启用 Docker Chroma 与百炼嵌入的步骤见[团队本地运行与向量检索指南](../../docs/团队本地运行与向量检索指南.md)。所有可调参数均可通过环境变量覆盖。
+复制 `.env.example` 为 `.env`，填写 `DEEPSEEK_API_KEY`、`DATABASE_URL` 和 `SESSION_ENCRYPTION_KEYS`。开发数据库可在项目根目录运行 `docker compose -f docker-compose.postgres.yml up -d`。未配置嵌入服务时知识库自动使用关键词检索。
 
 ## 运行
 
 ```powershell
 # 启动后端（在 backend 目录下）
-.venv\Scripts\python -m uvicorn app.main:app --reload --port 8000
+.venv\Scripts\python -m app.start --reload --port 8000
 ```
+
+该入口会先执行 `alembic upgrade head`，迁移失败时不会启动 API。单独检查或执行迁移可运行 `.venv\Scripts\python -m alembic current` 和 `.venv\Scripts\python -m alembic upgrade head`。
 
 - 健康检查：`GET /`
 - 交互式接口文档：浏览器打开 `http://127.0.0.1:8000/docs`
@@ -67,7 +69,10 @@ python -m venv .venv                       # 已创建可跳过
 | POST | `/api/auth/login` | 学号/密码/验证码登录 |
 | POST | `/api/auth/logout` | 退出并销毁会话 |
 | GET | `/api/auth/status` | 查询登录状态 |
-| POST | `/api/chat` | Agent 对话（请求头带 `X-Session-Token` 可查个人数据） |
+| POST | `/api/chat` | Agent 对话（必须登录，可传 `conversation_id`） |
+| GET | `/api/conversations` | 当前学生的历史会话列表 |
+| GET | `/api/conversations/{id}` | 分页读取历史消息 |
+| DELETE | `/api/conversations/{id}` | 删除历史会话 |
 | GET | `/api/schedule` | 个人课表 |
 | GET | `/api/classroom-schedule` | 教室课表 |
 | GET | `/api/grades` | 成绩列表与统计 |

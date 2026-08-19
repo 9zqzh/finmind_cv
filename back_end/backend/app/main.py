@@ -13,13 +13,16 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
-from app.api import auth, chat, competitions, information, jwxt, knowledge, resources
+from app.api import auth, chat, competitions, conversations, information, jwxt, knowledge, resources
 from app.config import get_settings
+from app.db import build_engine, build_session_factory
 from app.knowledge import KnowledgeService
 from app.knowledge.factory import build_knowledge_service
 from app.schemas.common import INVALID_PARAM, ApiError, fail, ok
 from app.services.conversation import ConversationManager
+from app.services.crypto import CookieCipher
 from app.services.session import SessionManager
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -27,10 +30,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """应用启动时初始化会话管理器、临时对话记忆与知识库。"""
+    """应用启动时验证数据库并初始化会话管理器、对话服务与知识库。"""
     settings = get_settings()
-    app.state.sessions = SessionManager(settings)
-    app.state.conversations = ConversationManager(settings)
+    if not settings.database_url.strip():
+        raise RuntimeError("DATABASE_URL is required")
+    cipher = CookieCipher(settings.encryption_keys)
+    engine = build_engine(settings.database_url)
+    sessions = build_session_factory(engine)
+    async with engine.connect() as connection:
+        await connection.execute(text("SELECT 1"))
+    app.state.db_engine = engine
+    app.state.db_sessions = sessions
+    app.state.sessions = SessionManager(settings, cipher)
+    app.state.conversations = ConversationManager()
     app.state.knowledge = build_knowledge_service(
         BASE_DIR / settings.knowledge_dir,
         settings,
@@ -39,7 +51,11 @@ async def lifespan(app: FastAPI):
     app.state.information = KnowledgeService.from_directory(
         BASE_DIR / settings.information_dir
     )
-    yield
+    try:
+        yield
+    finally:
+        await app.state.sessions.close()
+        await engine.dispose()
 
 
 app = FastAPI(
@@ -60,6 +76,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(chat.router)
+app.include_router(conversations.router)
 app.include_router(competitions.router)
 app.include_router(information.router)
 app.include_router(jwxt.router)

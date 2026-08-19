@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: finmind-postgres
+    environment:
+      POSTGRES_DB: finmind
+      POSTGRES_USER: finmind
+      POSTGRES_PASSWORD: finmind-dev-password
+    ports:
+      - "5432:5432"
+    volumes:
+      - finmind-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finmind -d finmind"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  finmind-postgres-data:

@@ -66,6 +66,11 @@ class Settings(BaseSettings):
     # Web 服务
     app_env: str = Field(default="development", alias="APP_ENV")
     session_ttl_minutes: int = Field(default=120, alias="SESSION_TTL_MINUTES")
+    login_session_ttl_days: int = Field(default=7, alias="LOGIN_SESSION_TTL_DAYS")
+
+    # PostgreSQL / sensitive session data
+    database_url: str = Field(default="", alias="DATABASE_URL")
+    session_encryption_keys: str = Field(default="", alias="SESSION_ENCRYPTION_KEYS")
 
     # 数据目录（相对 backend 目录）
     knowledge_dir: str = Field(default="data/knowledge", alias="KNOWLEDGE_DIR")
@@ -89,6 +94,11 @@ class Settings(BaseSettings):
                 self.embedding_model,
             )
         )
+
+    @property
+    def encryption_keys(self) -> list[str]:
+        """Fernet keys, newest first, for encryption and key rotation."""
+        return [key.strip() for key in self.session_encryption_keys.split(",") if key.strip()]
 
     @property
     def embedding_api_key_value(self) -> str:

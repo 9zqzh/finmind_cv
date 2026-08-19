@@ -49,6 +49,7 @@ flowchart LR
 
 - Python 3.10 或更高版本
 - Node.js 与 npm
+- PostgreSQL 14 或更高版本（可使用项目提供的 Docker Compose）
 - 可访问广东金融学院教务系统
 - DeepSeek API Key（仅 AI 对话功能需要）
 
@@ -66,6 +67,12 @@ python -m pip install -e ..\gduf-academic-api
 Copy-Item .env.example .env
 ```
 
+启动 PostgreSQL：
+
+```powershell
+docker compose -f docker-compose.postgres.yml up -d
+```
+
 打开 `back_end/backend/.env`，至少填写有效的 `DEEPSEEK_API_KEY`：
 
 ```dotenv
@@ -76,10 +83,10 @@ DEEPSEEK_MODEL=deepseek-v4-flash
 
 知识库默认支持两种模式：不配置嵌入服务时使用关键词检索；配置 Chroma 和百炼嵌入服务后自动使用向量检索。团队成员请优先阅读[团队本地运行与向量检索指南](docs/团队本地运行与向量检索指南.md)。
 
-启动服务：
+启动服务（自动执行 Alembic 数据库迁移）：
 
 ```powershell
-python -m uvicorn app.main:app --reload --port 8000
+python -m app.start --reload --port 8000
 ```
 
 后端健康检查地址为 <http://127.0.0.1:8000/>，交互式 API 文档为 <http://127.0.0.1:8000/docs>。
@@ -116,7 +123,10 @@ npm run dev
 | `AGENT_TIMEOUT_SECONDS` | `30` | Agent 超时配置（当前由模型客户端请求超时控制） |
 | `JWXT_BASE_URL` | `https://jwxt.gduf.edu.cn` | 教务系统根地址 |
 | `ACADEMIC_PROXY` | 空 | 学术资源平台代理地址（如 `http://127.0.0.1:7890`），留空直连 |
-| `SESSION_TTL_MINUTES` | `120` | 后端内存会话的空闲过期时间（分钟） |
+| `SESSION_TTL_MINUTES` | `120` | 验证码阶段内存会话的空闲过期时间（分钟） |
+| `LOGIN_SESSION_TTL_DAYS` | `7` | 已登录会话的滚动过期天数 |
+| `DATABASE_URL` | 空 | PostgreSQL 异步连接地址，必须配置 |
+| `SESSION_ENCRYPTION_KEYS` | 空 | Fernet 密钥列表（新密钥在前），必须配置 |
 | `KNOWLEDGE_DIR` | `data/knowledge` | 知识库资料目录 |
 | `INFORMATION_DIR` | `data/information` | 学院资讯与竞赛资料目录 |
 
@@ -159,12 +169,12 @@ X-Session-Token: <session_token>
 
 ## 数据与安全说明
 
-- 后端为每位用户创建独立的 `JwxtClient`，以隔离 Cookie、登录状态和成绩查询上下文；会话仅保存在服务进程内存中，服务重启后会失效。
-- 登录和未登录用户都支持最近 4 组问答的临时上下文记忆；刷新页面、服务重启或会话超时后自动清理。
+- 后端为每位用户创建独立的 `JwxtClient`；登录 Cookie 经 Fernet 加密后保存到 PostgreSQL，服务重启后会向教务系统验证并恢复。
+- 聊天必须登录；完整历史保存到 PostgreSQL，模型上下文只加载最近 4 组问答。
 - 验证码与教务系统的 `JSESSIONID` 绑定，获取验证码与登录必须使用同一会话。
-- 项目不会持久化学号和密码；前端仅将会话令牌保存在浏览器 `sessionStorage`。
+- 项目仅持久化学号作为用户标识，不保存教务密码或验证码；前端将随机会话令牌保存在 `localStorage`，数据库只保存其 SHA-256 摘要。
 - Agent 通过 14 个工具获取真实数据（教务查询、官网搜索、竞赛讯息、学术资源搜索、知识库检索等），避免直接编造；未登录时会返回相应提示。
-- 当前 CORS 为开发方便配置为允许全部来源。部署前应收紧 `allow_origins`，并将内存会话替换为适合生产环境的会话存储方案。
+- 当前 CORS 为开发方便配置为允许全部来源，部署前应收紧 `allow_origins` 并妥善管理数据库凭据与 Cookie 加密密钥。
 
 ## 测试与构建
 

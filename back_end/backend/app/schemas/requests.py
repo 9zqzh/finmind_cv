@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from pydantic import BaseModel, Field
 
 
@@ -18,6 +20,6 @@ class ChatRequest(BaseModel):
     """对话请求。"""
 
     message: str = Field(..., min_length=1, max_length=2000, description="用户问题")
-    session_token: str | None = Field(
-        default=None, description="教务登录会话标识；查询个人数据时必填"
+    conversation_id: UUID | None = Field(
+        default=None, description="继续已有会话时传入；留空时创建新会话"
     )

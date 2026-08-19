@@ -6,11 +6,12 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any, AsyncGenerator
 
 from pydantic_ai import Agent
 from pydantic_ai.exceptions import AgentRunError
-from pydantic_ai.messages import ModelMessagesTypeAdapter
+from pydantic_ai.messages import ModelMessagesTypeAdapter, ModelResponse, ThinkingPart
 
 from app.agent.model_client import build_model
 from app.agent.prompts import build_system_prompt
@@ -19,7 +20,7 @@ from app.config import Settings, get_settings
 from app.knowledge import KnowledgeService
 from app.schemas.chat import ChatResponse, ToolCallInfo
 from app.schemas.common import MODEL_ERROR, ApiError
-from app.services.conversation import ConversationMemory, ConversationTurn
+from app.services.conversation import ConversationMemory
 from app.services.session import JwxtSession
 
 _AGENT: Agent | None = None
@@ -87,7 +88,7 @@ async def run_chat(
 ) -> ChatResponse:
     """执行一轮对话并返回统一结构的 ChatResponse。
 
-    传入临时对话记忆时，把最近四轮作为 message_history 传入模型，
+    传入持久化对话记忆时，把最近四轮作为 message_history 传入模型，
     并在本轮成功完成后保存新增消息。
     """
     settings = settings or get_settings()
@@ -101,8 +102,6 @@ async def run_chat(
         raise ApiError(MODEL_ERROR, "模型响应超时，请稍后重试", status_code=504) from exc
 
     answer = str(result.output)
-    _save_turn(memory, result)
-
     tool_calls = [
         ToolCallInfo(
             tool=event["tool"],
@@ -120,7 +119,7 @@ async def run_chat(
     else:
         data = deps.last_data if deps.tool_events else None
         sources = deps.sources
-    return ChatResponse(
+    response = ChatResponse(
         answer=answer,
         intent=deps.last_result_type if deps.tool_events else "chat",
         tool_calls=tool_calls,
@@ -129,6 +128,8 @@ async def run_chat(
         sources=sources,
         conversation_id=memory.conversation_id if memory else None,
     )
+    await _save_turn(memory, message, result, response)
+    return response
 
 
 def _load_history(memory: ConversationMemory | None):
@@ -146,17 +147,26 @@ def _load_history(memory: ConversationMemory | None):
         return []
 
 
-def _save_turn(memory: ConversationMemory | None, result) -> None:
+async def _save_turn(
+    memory: ConversationMemory | None,
+    user_message: str,
+    result,
+    response: ChatResponse,
+) -> None:
     """保存本轮新增模型消息，并裁剪至最近 HISTORY_MAX_TURNS 轮。"""
     if memory is None:
         return
     try:
-        messages_json = ModelMessagesTypeAdapter.dump_json(result.new_messages())
+        messages = [
+            replace(message, parts=[part for part in message.parts if not isinstance(part, ThinkingPart)])
+            if isinstance(message, ModelResponse)
+            else message
+            for message in result.new_messages()
+        ]
+        messages_json = ModelMessagesTypeAdapter.dump_json(messages)
     except Exception:
         return
-    memory.chat_history.append(ConversationTurn(model_messages_json=messages_json.decode()))
-    if len(memory.chat_history) > HISTORY_MAX_TURNS:
-        del memory.chat_history[:-HISTORY_MAX_TURNS]
+    await memory.save(user_message, messages_json.decode(), response.model_dump(mode="json"))
 
 from pydantic_ai.messages import (
     FunctionToolCallEvent,
@@ -203,7 +213,6 @@ async def run_chat_stream(
                     yield {"type": "text", "content": ev.delta.content_delta}
                 elif isinstance(ev, AgentRunResultEvent):
                     # 构建最终结构化响应
-                    _save_turn(memory, ev.result)
                     tool_calls = [
                         ToolCallInfo(
                             tool=evt["tool"],
@@ -229,6 +238,7 @@ async def run_chat_stream(
                         sources=sources,
                         conversation_id=memory.conversation_id if memory else None,
                     )
+                    await _save_turn(memory, message, ev.result, response)
                     yield {"type": "done", "chat": response.model_dump()}
     except AgentRunError as exc:
         yield {"type": "error", "message": f"模型服务请求失败：{exc}"}

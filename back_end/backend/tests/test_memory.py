@@ -5,14 +5,15 @@ from __future__ import annotations
 import pytest
 from pydantic_ai import Agent
 from pydantic_ai.messages import ModelMessagesTypeAdapter
+from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ThinkingPart, UserPromptPart
 from pydantic_ai.models.test import TestModel
 
 from app.agent import orchestrator
-from app.agent.orchestrator import HISTORY_MAX_TURNS, _load_history, run_chat, run_chat_stream
+from app.agent.orchestrator import HISTORY_MAX_TURNS, _load_history, _save_turn, run_chat, run_chat_stream
 from app.agent.tools import AgentDeps
-from app.config import Settings
-from app.services.conversation import ConversationManager, ConversationMemory, ConversationTurn
+from app.services.conversation import ConversationMemory, ConversationTurn
 from app.services.session import JwxtSession
+from app.schemas.chat import ChatResponse
 
 
 def _fake_session() -> JwxtSession:
@@ -102,20 +103,6 @@ async def test_streaming_chat_saves_a_completed_turn(test_agent):
     assert "普通接口追问" in _history_text(memory)
 
 
-def test_expired_conversation_is_recreated_without_history():
-    manager = ConversationManager(Settings(session_ttl_minutes=1))
-    original = manager.get_or_create("page-1")
-    assert original is not None
-    original.chat_history.append(ConversationTurn(model_messages_json="[]"))
-    original.last_active = 0
-
-    recreated = manager.get_or_create("page-1")
-
-    assert recreated is not None
-    assert recreated is not original
-    assert recreated.chat_history == []
-
-
 @pytest.mark.asyncio
 async def test_corrupted_history_degrades_to_a_new_turn(test_agent):
     memory = ConversationMemory(conversation_id="page-1")
@@ -127,3 +114,20 @@ async def test_corrupted_history_degrades_to_a_new_turn(test_agent):
     assert response.answer
     assert len(memory.chat_history) == 1
     assert "第二轮" in _history_text(memory)
+
+
+@pytest.mark.asyncio
+async def test_persisted_model_messages_remove_thinking_content():
+    memory = ConversationMemory(conversation_id="page-1")
+
+    class Result:
+        def new_messages(self):
+            return [
+                ModelRequest(parts=[UserPromptPart("问题")]),
+                ModelResponse(parts=[ThinkingPart("不应落库"), TextPart("回答")]),
+            ]
+
+    await _save_turn(memory, "问题", Result(), ChatResponse(answer="回答"))
+
+    assert "不应落库" not in memory.chat_history[0].model_messages_json
+    assert "回答" in memory.chat_history[0].model_messages_json

@@ -1,16 +1,19 @@
-"""FastAPI 依赖注入：会话、知识库等共享对象的获取方式。"""
+"""FastAPI dependencies for database, sessions, and shared services."""
 
 from __future__ import annotations
 
-from fastapi import Header, Request
+from collections.abc import AsyncIterator
+
+from fastapi import Depends, Header, Request
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.jwxt import require_login
+from app.db import get_db
 from app.knowledge import KnowledgeService
-from app.services.conversation import ConversationManager, ConversationMemory
+from app.services.conversation import ConversationManager
 from app.services.session import JwxtSession, SessionManager
 
 SESSION_HEADER = "X-Session-Token"
-CONVERSATION_HEADER = "X-Conversation-Id"
 
 
 def get_session_manager(request: Request) -> SessionManager:
@@ -29,26 +32,29 @@ def get_information(request: Request) -> KnowledgeService:
     return request.app.state.information
 
 
-def get_optional_session(
+async def get_optional_session(
     request: Request,
     x_session_token: str | None = Header(default=None, alias=SESSION_HEADER),
-) -> JwxtSession | None:
-    """从请求头取会话；无效或过期返回 None。"""
-    return get_session_manager(request).get(x_session_token)
+    db: AsyncSession = Depends(get_db),
+) -> AsyncIterator[JwxtSession | None]:
+    manager = get_session_manager(request)
+    session = await manager.get(x_session_token, db)
+    try:
+        yield session
+    finally:
+        if session is not None and session.is_logged_in:
+            await manager.sync_cookies(session, db)
 
 
-def get_optional_conversation(
-    request: Request,
-    x_conversation_id: str | None = Header(default=None, alias=CONVERSATION_HEADER),
-) -> ConversationMemory | None:
-    """取得当前页面的临时对话记忆；该标识不落盘。"""
-    return get_conversation_manager(request).get_or_create(x_conversation_id)
-
-
-def get_required_session(
+async def get_required_session(
     request: Request,
     x_session_token: str | None = Header(default=None, alias=SESSION_HEADER),
-) -> JwxtSession:
-    """取已登录会话，否则抛 AUTH_REQUIRED。"""
-    session = get_session_manager(request).get(x_session_token)
-    return require_login(session)
+    db: AsyncSession = Depends(get_db),
+) -> AsyncIterator[JwxtSession]:
+    manager = get_session_manager(request)
+    session = require_login(await manager.get(x_session_token, db))
+    try:
+        yield session
+    finally:
+        if session.is_logged_in:
+            await manager.sync_cookies(session, db)

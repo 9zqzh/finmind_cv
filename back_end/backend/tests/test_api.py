@@ -2,18 +2,36 @@
 
 from __future__ import annotations
 
+import asyncio
+import os
+
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.ext.asyncio import create_async_engine
 
-from app.api import chat as chat_api
+from app.config import get_settings
 from app.main import app
-from app.schemas.chat import ChatResponse
+from app.models import Base
 
 
 @pytest.fixture(scope="module")
-def client():
+def client(tmp_path_factory):
+    database_path = tmp_path_factory.mktemp("api-db") / "test.sqlite3"
+    os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{database_path.as_posix()}"
+    os.environ["SESSION_ENCRYPTION_KEYS"] = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+    os.environ["APP_ENV"] = "test"
+    get_settings.cache_clear()
+
+    async def prepare_database():
+        engine = create_async_engine(os.environ["DATABASE_URL"])
+        async with engine.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
+        await engine.dispose()
+
+    asyncio.run(prepare_database())
     with TestClient(app) as test_client:
         yield test_client
+    get_settings.cache_clear()
 
 
 def test_health(client):
@@ -30,23 +48,13 @@ def test_auth_status_without_token(client):
     assert response.json()["data"]["logged_in"] is False
 
 
-def test_chat_uses_temporary_conversation_header(client, monkeypatch):
-    received_memories = []
+def test_chat_and_history_require_login(client):
+    chat = client.post("/api/chat", json={"message": "第一轮"})
+    history = client.get("/api/conversations")
 
-    async def fake_run_chat(message, deps, session=None, memory=None):
-        received_memories.append(memory)
-        return ChatResponse(answer="ok")
-
-    monkeypatch.setattr(chat_api, "run_chat", fake_run_chat)
-    headers = {"X-Conversation-Id": "browser-page-1"}
-
-    first = client.post("/api/chat", json={"message": "第一轮"}, headers=headers)
-    second = client.post("/api/chat", json={"message": "第二轮"}, headers=headers)
-
-    assert first.status_code == 200
-    assert second.status_code == 200
-    assert received_memories[0] is received_memories[1]
-    assert received_memories[0].conversation_id == "browser-page-1"
+    assert chat.status_code == 401
+    assert history.status_code == 401
+    assert chat.json()["code"] == "AUTH_REQUIRED"
 
 
 def test_schedule_requires_login(client):

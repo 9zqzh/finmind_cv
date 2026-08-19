@@ -4,6 +4,8 @@ import type {
   AuthStatus,
   CaptchaData,
   ChatData,
+  ConversationDetailData,
+  ConversationListData,
   ClassroomSchedule,
   GradeReport,
   LoginData,
@@ -16,14 +18,14 @@ import type {
 const TOKEN_KEY = "session_token";
 
 export function getToken(): string | null {
-  return sessionStorage.getItem(TOKEN_KEY);
+  return localStorage.getItem(TOKEN_KEY);
 }
 
 export function setToken(token: string | null) {
   if (token) {
-    sessionStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(TOKEN_KEY, token);
   } else {
-    sessionStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(TOKEN_KEY);
   }
 }
 
@@ -88,13 +90,30 @@ export const api = {
     client.get<ApiEnvelope<AuthStatus>>("/api/auth/status").then(unwrap),
 
   // ---- 对话 ----
-  chat: (message: string) =>
+  chat: (message: string, conversationId?: string | null) =>
     client
       .post<ApiEnvelope<ChatData>>("/api/chat", {
         message,
-        session_token: getToken(),
+        conversation_id: conversationId || null,
       })
       .then(unwrap),
+  conversations: (page = 1, pageSize = 20) =>
+    client
+      .get<ApiEnvelope<ConversationListData>>("/api/conversations", {
+        params: { page, page_size: pageSize },
+      })
+      .then(unwrap),
+  conversation: (id: string, beforePosition?: number, limit = 50) =>
+    client
+      .get<ApiEnvelope<ConversationDetailData>>(`/api/conversations/${id}`, {
+        params: {
+          limit,
+          ...(beforePosition ? { before_position: beforePosition } : {}),
+        },
+      })
+      .then(unwrap),
+  deleteConversation: (id: string) =>
+    client.delete<ApiEnvelope<{ deleted: boolean }>>(`/api/conversations/${id}`).then(unwrap),
 
   // ---- 教务查询 ----
   schedule: (term: string, week?: number) =>

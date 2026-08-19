@@ -1,10 +1,15 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Avatar,
   Button,
   Card,
+  Drawer,
+  Empty,
+  Grid,
   Descriptions,
   Input,
+  List,
+  Modal,
   Space,
   Spin,
   Table,
@@ -13,15 +18,18 @@ import {
 } from "antd";
 import {
   BulbOutlined,
+  DeleteOutlined,
+  HistoryOutlined,
   LoadingOutlined,
   RobotOutlined,
   SendOutlined,
+  PlusOutlined,
   UserOutlined,
 } from "@ant-design/icons";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { getToken } from "../api/client";
-import type { ChatData } from "../api/types";
+import { api, getToken } from "../api/client";
+import type { ChatData, ConversationSummary, StoredTurn } from "../api/types";
 import {
   applyStreamSnapshot,
   collapseThinking,
@@ -170,8 +178,114 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [hasMoreTurns, setHasMoreTurns] = useState(false);
+  const [oldestPosition, setOldestPosition] = useState<number | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const conversationIdRef = useRef(crypto.randomUUID());
+  const screens = Grid.useBreakpoint();
+  const isMobile = !screens.md;
+
+  const turnsToMessages = (turns: StoredTurn[]): ChatMessage[] =>
+    turns.flatMap((turn) => [
+      createUserMessage(`${turn.id}-user`, turn.user_message),
+      {
+        ...createAssistantMessage(`${turn.id}-assistant`),
+        text: turn.response.answer,
+        chat: turn.response,
+        toolCalls: turn.response.tool_calls.map((call) => ({
+          tool_name: call.tool,
+          status: "done" as const,
+        })),
+      },
+    ]);
+
+  const refreshConversations = async () => {
+    const data = await api.conversations();
+    setConversations(data.items);
+    return data.items;
+  };
+
+  const openConversation = async (id: string) => {
+    if (loading) return;
+    setHistoryLoading(true);
+    try {
+      const data = await api.conversation(id);
+      setMessages(turnsToMessages(data.turns));
+      setActiveConversationId(id);
+      setHasMoreTurns(data.has_more);
+      setOldestPosition(data.turns[0]?.position ?? null);
+      setHistoryOpen(false);
+      scrollToBottom();
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+    setHistoryLoading(true);
+    api
+      .conversations()
+      .then(async (data) => {
+        if (!active) return;
+        setConversations(data.items);
+        if (data.items[0]) await openConversation(data.items[0].id);
+      })
+      .catch(() => {
+        if (active) setConversations([]);
+      })
+      .finally(() => active && setHistoryLoading(false));
+    return () => {
+      active = false;
+    };
+    // Only load persisted history when the chat page is mounted.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const startNewConversation = () => {
+    if (loading) return;
+    setActiveConversationId(null);
+    setMessages([]);
+    setHasMoreTurns(false);
+    setOldestPosition(null);
+    setHistoryOpen(false);
+  };
+
+  const loadOlderTurns = async () => {
+    if (!activeConversationId || !oldestPosition || historyLoading) return;
+    setHistoryLoading(true);
+    try {
+      const data = await api.conversation(activeConversationId, oldestPosition);
+      setMessages((current) => [...turnsToMessages(data.turns), ...current]);
+      setHasMoreTurns(data.has_more);
+      setOldestPosition(data.turns[0]?.position ?? oldestPosition);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const confirmDelete = (item: ConversationSummary) => {
+    if (loading) return;
+    Modal.confirm({
+      title: "删除这段对话？",
+      content: "删除后无法恢复。",
+      okText: "删除",
+      okButtonProps: { danger: true },
+      cancelText: "取消",
+      onOk: async () => {
+        await api.deleteConversation(item.id);
+        const remaining = conversations.filter((conversation) => conversation.id !== item.id);
+        setConversations(remaining);
+        if (activeConversationId === item.id) {
+          if (remaining[0]) await openConversation(remaining[0].id);
+          else startNewConversation();
+        }
+      },
+    });
+  };
 
   const updateAssistant = (
     assistantId: string,
@@ -242,10 +356,12 @@ export default function ChatPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Conversation-Id": conversationIdRef.current,
           ...(token ? { "X-Session-Token": token } : {}),
         },
-        body: JSON.stringify({ message: question }),
+        body: JSON.stringify({
+          message: question,
+          conversation_id: activeConversationId,
+        }),
       });
 
       if (!response.ok || !response.body) {
@@ -320,10 +436,15 @@ export default function ChatPage() {
         flushTimer = null;
       }
 
-      if (finalChat) {
+      const completedChat = finalChat as ChatData | null;
+      if (completedChat) {
+        if (completedChat.conversation_id) {
+          setActiveConversationId(completedChat.conversation_id);
+        }
         updateAssistant(assistantId, (message) =>
-          completeAssistantMessage(message, finalChat!, accumulatedThinking, toolCalls),
+          completeAssistantMessage(message, completedChat, accumulatedThinking, toolCalls),
         );
+        await refreshConversations();
       } else {
         thinkingExpanded = false;
         flush();
@@ -340,19 +461,98 @@ export default function ChatPage() {
     }
   };
 
-
+  const historyContent = (
+    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      <Button
+        type="primary"
+        icon={<PlusOutlined />}
+        onClick={startNewConversation}
+        disabled={loading}
+        style={{ marginBottom: 12 }}
+      >
+        新对话
+      </Button>
+      <div style={{ flex: 1, overflowY: "auto" }}>
+        {conversations.length === 0 ? (
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无历史对话" />
+        ) : (
+          <List
+            size="small"
+            loading={historyLoading}
+            dataSource={conversations}
+            renderItem={(item) => (
+              <List.Item
+                onClick={() => openConversation(item.id)}
+                style={{
+                  cursor: loading ? "not-allowed" : "pointer",
+                  padding: "10px 8px",
+                  borderRadius: 8,
+                  background: activeConversationId === item.id ? "#e6f4ff" : undefined,
+                }}
+                actions={[
+                  <Button
+                    key="delete"
+                    type="text"
+                    danger
+                    size="small"
+                    aria-label="删除对话"
+                    icon={<DeleteOutlined />}
+                    disabled={loading}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      confirmDelete(item);
+                    }}
+                  />,
+                ]}
+              >
+                <Typography.Text ellipsis style={{ maxWidth: 150 }}>
+                  {item.title}
+                </Typography.Text>
+              </List.Item>
+            )}
+          />
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div
       className="chat-page"
-      style={{ display: "flex", flexDirection: "column", height: "calc(100dvh - 112px)" }}
+      style={{ display: "flex", height: "calc(100dvh - 112px)", gap: 16 }}
     >
+      {!isMobile && (
+        <Card
+          size="small"
+          title={<><HistoryOutlined /> 历史对话</>}
+          style={{ width: 240, flexShrink: 0 }}
+          styles={{ body: { height: "calc(100% - 46px)", padding: 12 } }}
+        >
+          {historyContent}
+        </Card>
+      )}
+      <Drawer
+        title="历史对话"
+        placement="left"
+        width="82%"
+        open={isMobile && historyOpen}
+        onClose={() => setHistoryOpen(false)}
+      >
+        {historyContent}
+      </Drawer>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
       <div
         ref={listRef}
         className="chat-list"
         style={{ flex: 1, overflowY: "auto", padding: "8px 4px" }}
       >
-
+          {hasMoreTurns && (
+            <div style={{ textAlign: "center", marginBottom: 12 }}>
+              <Button size="small" loading={historyLoading} onClick={loadOlderTurns}>
+                加载更早记录
+              </Button>
+            </div>
+          )}
           {messages.length === 0 && (
             <Card className="chat-welcome" style={{ textAlign: "center", marginTop: 40 }}>
               <Typography.Title level={4}>👋 你好，我是数智金院 FinMind</Typography.Title>
@@ -497,6 +697,15 @@ export default function ChatPage() {
         style={{ paddingTop: 12, borderTop: "1px solid #f0f0f0" }}
       >
         <Space.Compact style={{ width: "100%" }}>
+          {isMobile && (
+            <Button
+              size="large"
+              icon={<HistoryOutlined />}
+              onClick={() => setHistoryOpen(true)}
+              disabled={loading}
+              aria-label="打开历史对话"
+            />
+          )}
           <Input
             size="large"
             value={input}
@@ -515,6 +724,7 @@ export default function ChatPage() {
             发送
           </Button>
         </Space.Compact>
+      </div>
       </div>
     </div>
   );

@@ -40,6 +40,34 @@ export interface ChatData {
   conversation_id?: string | null;
 }
 
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConversationListData {
+  items: ConversationSummary[];
+  page: number;
+  page_size: number;
+  total: number;
+}
+
+export interface StoredTurn {
+  id: string;
+  position: number;
+  user_message: string;
+  response: ChatData;
+  created_at: string;
+}
+
+export interface ConversationDetailData {
+  conversation: ConversationSummary;
+  turns: StoredTurn[];
+  has_more: boolean;
+}
+
 export interface ScheduleEntry {
   course_name: string;
   teacher: string | null;

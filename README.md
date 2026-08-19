@@ -68,6 +68,25 @@ docker compose --profile vector up --build -d
 
 后端会通过 Compose 服务名 `chroma:8000` 连接向量数据库；未启动 Profile 或嵌入配置不完整时会自动回退到关键词检索。
 
+## GitHub Release 自动部署
+
+普通分支推送和 Pull Request 只运行前后端测试，不构建或发布 Docker 镜像。只有在 GitHub 仓库的 Releases 页面创建并发布 Release 后，`.github/workflows/ci-cd.yml` 才会：
+
+1. 为前端和后端构建 Docker 镜像；
+2. 将镜像推送到阿里云 ACR 的 `liangjz1/finmind` 私有仓库；
+3. 使用发行标签、提交 SHA 和 `latest` 分别标记镜像；
+4. 通过 SSH 上传 `compose.prod.yaml`，并让服务器拉取本次发行提交对应的镜像。
+
+服务器需要预先创建 `/opt/finmind/.env`，其中包含普通运行配置以及镜像拉取地址：
+
+```dotenv
+# 广州同 VPC 的阿里云 ECS 使用专有网络地址；其他服务器使用公网地址。
+ACR_PULL_REGISTRY=crpi-q46i31ygwyvi127o-vpc.cn-guangzhou.personal.cr.aliyuncs.com
+IMAGE_TAG=latest
+```
+
+服务器还需要使用对应的公网或专有网络域名执行一次 `docker login`。GitHub Actions 需要配置 `ACR_USERNAME`、`ACR_PASSWORD`、`SSH_HOST`、`SSH_PORT`、`SSH_USER`、`SSH_PRIVATE_KEY` 和 `SSH_KNOWN_HOSTS` Secrets。
+
 ## 非 Docker 本地开发
 
 ### 后端

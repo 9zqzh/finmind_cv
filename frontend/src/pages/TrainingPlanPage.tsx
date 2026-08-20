@@ -64,7 +64,7 @@ export function TrainingPlanContent() {
           查询培养方案
         </Button>
       </Space>
-      <Typography.Text type="secondary">
+      <Typography.Text type="secondary" style={{ marginLeft: 16 }}>
         展示当前登录学生的完整培养方案课程清单。
       </Typography.Text>
       {plan && (

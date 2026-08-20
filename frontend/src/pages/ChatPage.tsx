@@ -136,7 +136,11 @@ function MapCitationCard({ citation }: { citation: CitationInfo }) {
   const url = trustedAmapUrl(citation.url);
   const isPlace = citation.type === "map_place";
   const content = (
-    <Card className="map-citation-card" size="small" bordered>
+    <Card
+      className={`map-citation-card${isPlace ? " map-citation-card--place" : ""}`}
+      size="small"
+      bordered
+    >
       {isPlace && <PlaceCover imageUrl={data.image_url} name={citation.title} />}
       <div className="map-citation-card__content">
         <div className="map-citation-card__header">
@@ -323,6 +327,7 @@ function ResultCard({ chat }: { chat: ChatData }) {
       const places = (data.places ?? []) as any[];
       return (
         <List
+          className={`map-place-results${places.length === 1 ? " map-place-results--single" : ""}`}
           size="small"
           dataSource={places}
           renderItem={(item) => {

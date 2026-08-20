@@ -327,6 +327,27 @@ svg {
   gap: 4px;
   margin-top: 8px;
 }
+
+/* 宽屏下地图通常只返回一张门店图，限制卡片宽度以免图片被横向拉伸。 */
+@media (min-width: 768px) {
+  .map-citation-link {
+    width: min(100%, 560px);
+  }
+
+  .map-citation-card--place .map-place-cover {
+    height: auto;
+    aspect-ratio: 16 / 9;
+  }
+
+  .map-place-results--single {
+    width: min(100%, 560px);
+  }
+
+  .map-place-results--single .map-place-cover {
+    height: auto;
+    aspect-ratio: 16 / 9;
+  }
+}
 .markdown-body table {
   border-collapse: collapse;
   margin: 0 0 8px;

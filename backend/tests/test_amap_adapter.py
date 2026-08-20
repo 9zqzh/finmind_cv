@@ -61,6 +61,7 @@ def _dispatch(request: httpx.Request) -> httpx.Response:
             }
         )
     if path == "/v3/place/around":
+        assert params.get("extensions") == "all"
         return json_response(
             {
                 "status": "1",
@@ -74,6 +75,10 @@ def _dispatch(request: httpx.Request) -> httpx.Response:
                         "biz_ext": {"rating": "4.5", "cost": "45"},
                         "distance": "800",
                         "cityname": "清远市",
+                        "photos": [
+                            {"title": "无效图片", "url": "javascript:alert(1)"},
+                            {"title": "门店", "url": "https://store.is.autonavi.com/shop.jpg"},
+                        ],
                     },
                     {
                         "name": "无坐标店",
@@ -85,6 +90,8 @@ def _dispatch(request: httpx.Request) -> httpx.Response:
             }
         )
     if path == "/v3/place/text":
+        if params.get("keywords") == "商场":
+            assert params.get("extensions") == "all"
         if params.get("keywords") == "无法解析的地方":
             return json_response({"status": "1", "pois": [{"name": "清远万达广场", "location": "113.10,23.66", "adcode": "441800"}]})
         return json_response(
@@ -180,6 +187,7 @@ def test_search_places_around_parses_poi(amap_client):
     assert first["distance"] == 800
     assert first["city"] == "清远市"
     assert first["review_source"] == "amap"
+    assert first["image_url"] == "https://store.is.autonavi.com/shop.jpg"
 
 
 def test_search_places_text_without_location(amap_client):
@@ -188,6 +196,7 @@ def test_search_places_text_without_location(amap_client):
     assert first["name"] == "万达广场"
     assert first["distance"] is None  # 关键词搜索无距离
     assert first["rating"] == 4.3
+    assert first["image_url"] == ""
 
 
 # ---- 位置解析 ----

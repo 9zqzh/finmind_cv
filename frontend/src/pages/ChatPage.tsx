@@ -103,45 +103,76 @@ function trustedAmapUrl(value: string | null | undefined) {
   }
 }
 
+function trustedImageUrl(value: unknown) {
+  if (typeof value !== "string" || !value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+function PlaceCover({ imageUrl, name }: { imageUrl: unknown; name: string }) {
+  const url = trustedImageUrl(imageUrl);
+  if (!url) return null;
+  return (
+    <div className="map-place-cover">
+      <img
+        src={url}
+        alt={`${name}门店图片`}
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        onError={(event) => {
+          event.currentTarget.style.display = "none";
+        }}
+      />
+    </div>
+  );
+}
+
 function MapCitationCard({ citation }: { citation: CitationInfo }) {
   const data = citation.data as Record<string, any>;
   const url = trustedAmapUrl(citation.url);
   const isPlace = citation.type === "map_place";
   const content = (
     <Card className="map-citation-card" size="small" bordered>
-      <div className="map-citation-card__header">
-        <EnvironmentOutlined className="map-citation-card__pin" />
-        <Typography.Text strong className="map-citation-card__title">
-          {citation.title}
-        </Typography.Text>
-        <span className="map-citation-card__action">
-          {isPlace ? "查看位置" : "打开导航"} ↗
-        </span>
-      </div>
-      {isPlace ? (
-        <>
-          <Space size={[4, 4]} wrap className="map-citation-card__tags">
-            {ratingTag(Number(data.rating))}
-            {Number(data.cost) > 0 && <Tag color="gold">人均 ¥{data.cost}</Tag>}
-            {Number(data.comment_num) > 0 && <Tag>{data.comment_num} 条点评</Tag>}
-            {formatDistance(Number(data.distance)) && (
-              <Tag color="blue">距中心 {formatDistance(Number(data.distance))}</Tag>
-            )}
-          </Space>
-          {data.address && (
-            <Typography.Text type="secondary" className="map-citation-card__meta">
-              {String(data.address)}
-            </Typography.Text>
-          )}
-        </>
-      ) : (
-        <div className="map-citation-card__route">
-          <Tag color="geekblue">{MODE_LABELS[String(data.mode)] ?? data.mode ?? "路线"}</Tag>
-          <Typography.Text type="secondary">
-            {data.distance_text ?? "距离未知"} · {data.duration_text ?? "耗时未知"}
+      {isPlace && <PlaceCover imageUrl={data.image_url} name={citation.title} />}
+      <div className="map-citation-card__content">
+        <div className="map-citation-card__header">
+          <EnvironmentOutlined className="map-citation-card__pin" />
+          <Typography.Text strong className="map-citation-card__title">
+            {citation.title}
           </Typography.Text>
+          <span className="map-citation-card__action">
+            {isPlace ? "查看位置" : "打开导航"} ↗
+          </span>
         </div>
-      )}
+        {isPlace ? (
+          <>
+            <Space size={[4, 4]} wrap className="map-citation-card__tags">
+              {ratingTag(Number(data.rating))}
+              {Number(data.cost) > 0 && <Tag color="gold">人均 ¥{data.cost}</Tag>}
+              {Number(data.comment_num) > 0 && <Tag>{data.comment_num} 条点评</Tag>}
+              {formatDistance(Number(data.distance)) && (
+                <Tag color="blue">距中心 {formatDistance(Number(data.distance))}</Tag>
+              )}
+            </Space>
+            {data.address && (
+              <Typography.Text type="secondary" className="map-citation-card__meta">
+                {String(data.address)}
+              </Typography.Text>
+            )}
+          </>
+        ) : (
+          <div className="map-citation-card__route">
+            <Tag color="geekblue">{MODE_LABELS[String(data.mode)] ?? data.mode ?? "路线"}</Tag>
+            <Typography.Text type="secondary">
+              {data.distance_text ?? "距离未知"} · {data.duration_text ?? "耗时未知"}
+            </Typography.Text>
+          </div>
+        )}
+      </div>
     </Card>
   );
 
@@ -299,6 +330,7 @@ function ResultCard({ chat }: { chat: ChatData }) {
             return (
               <List.Item style={{ paddingInline: 0 }}>
                 <div style={{ width: "100%" }}>
+                  <PlaceCover imageUrl={item.image_url} name={item.name ?? "地点"} />
                   <Space wrap>
                     <Typography.Text strong>{item.name}</Typography.Text>
                     {ratingTag(Number(item.rating))}

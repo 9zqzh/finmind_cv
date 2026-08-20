@@ -19,7 +19,7 @@ import asyncio
 import logging
 import re
 from typing import Any, Callable, TypeVar
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 import httpx
 
@@ -200,6 +200,15 @@ def _normalize_poi(poi: dict[str, Any], has_distance: bool) -> dict[str, Any]:
     """把高德 POI 精简为紧凑结构，评分/人均缺失时置 0。"""
     biz_ext = poi.get("biz_ext") or {}
     rating = _to_float(biz_ext.get("rating") or poi.get("rating"))
+    image_url = ""
+    for photo in poi.get("photos") or []:
+        if not isinstance(photo, dict):
+            continue
+        candidate = str(photo.get("url") or "").strip()
+        parsed = urlparse(candidate)
+        if parsed.scheme == "https" and parsed.netloc:
+            image_url = candidate
+            break
     return {
         "name": str(poi.get("name") or "")[:NAME_LIMIT],
         "location": str(poi.get("location") or ""),
@@ -212,6 +221,7 @@ def _normalize_poi(poi: dict[str, Any], has_distance: bool) -> dict[str, Any]:
         "city": str(poi.get("cityname") or poi.get("adname") or ""),
         "comment_num": 0,
         "review_source": "amap",
+        "image_url": image_url,
     }
 
 
@@ -230,12 +240,15 @@ def search_places_sync(
                 "location": location,
                 "radius": str(max(radius, 100)),
                 "sortrule": "distance",
+                "extensions": "all",
             },
         )
         pois = payload.get("pois") or []
         items = [_normalize_poi(poi, True) for poi in pois]
     else:
-        payload = _amap_get("/v3/place/text", {"keywords": keywords, "city": city})
+        payload = _amap_get(
+            "/v3/place/text", {"keywords": keywords, "city": city, "extensions": "all"}
+        )
         pois = payload.get("pois") or []
         items = [_normalize_poi(poi, False) for poi in pois]
     # 过滤无坐标的无效条目并截断

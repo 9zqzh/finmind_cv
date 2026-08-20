@@ -12,8 +12,10 @@ import {
 } from "@ant-design/icons";
 import { useAuth } from "../context/AuthContext";
 import logo from "../assets/logo.jpg";
+import packageJson from "../../package.json";
 
 const { Header, Sider, Content } = Layout;
+const appVersion = `v${packageJson.version}`;
 
 const menuItems = [
   { key: "/", icon: <HomeOutlined />, label: "AI 对话" },
@@ -47,9 +49,18 @@ export default function AppLayout() {
       mode="inline"
       selectedKeys={[location.pathname]}
       items={menuItems}
-      style={{ height: "100%", borderRight: 0 }}
+      style={{ flex: 1, borderRight: 0 }}
       onClick={({ key }) => handleNavigate(key)}
     />
+  );
+
+  const versionLabel = (
+    <Typography.Text
+      type="secondary"
+      style={{ display: "block", fontSize: 12, textAlign: "center" }}
+    >
+      当前版本 {appVersion}
+    </Typography.Text>
   );
 
   return (
@@ -158,7 +169,9 @@ export default function AppLayout() {
         >
           数智金院 FinMind
         </div>
-        <div style={{ flex: 1 }}>{navigationMenu}</div>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+          {navigationMenu}
+        </div>
         <div
           style={{
             padding: 16,
@@ -173,6 +186,7 @@ export default function AppLayout() {
             <Button block icon={<LogoutOutlined />} onClick={handleLogout}>
               退出登录
             </Button>
+            {versionLabel}
           </Space>
         </div>
       </Drawer>
@@ -183,7 +197,24 @@ export default function AppLayout() {
             theme="light"
             style={{ borderRight: "1px solid #e6eef8" }}
           >
-            {navigationMenu}
+            <div
+              style={{
+                height: "100%",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              {navigationMenu}
+              <div
+                style={{
+                  flexShrink: 0,
+                  padding: "12px 16px",
+                  borderTop: "1px solid #e6eef8",
+                }}
+              >
+                {versionLabel}
+              </div>
+            </div>
           </Sider>
         )}
         <Content

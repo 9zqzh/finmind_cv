@@ -130,6 +130,27 @@ def test_missing_directory_gives_empty_store(tmp_path):
     assert store.match("任意消息") is None
 
 
+def test_store_auto_reloads_on_file_changes(tmp_path):
+    """运行中新增/修改/删除手册文件时无需重启即可生效。"""
+    _write(tmp_path, "01.md", ENTRY_TEXT)
+    store = PlaybookStore(tmp_path)
+    assert len(store.entries) == 1
+
+    # 新增文件：下一次匹配即可命中
+    _write(tmp_path, "02.md", SECOND_TEXT)
+    assert store.match("什么时候选课").title == "选课手册"
+    assert len(store.entries) == 2
+
+    # 修改内容：标题变更后自动重新加载
+    _write(tmp_path, "02.md", SECOND_TEXT.replace("选课手册", "选课手册新版"))
+    assert store.match("什么时候选课").title == "选课手册新版"
+
+    # 删除文件：条目随之移除
+    (tmp_path / "02.md").unlink()
+    assert store.match("什么时候选课") is None
+    assert len(store.entries) == 1
+
+
 def test_build_playbook_instructions(tmp_path):
     _write(tmp_path, "01.md", ENTRY_TEXT)
     store = PlaybookStore(tmp_path)

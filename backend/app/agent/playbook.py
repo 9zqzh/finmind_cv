@@ -118,17 +118,26 @@ class PlaybookStore:
     """操作手册条目存储与关键词匹配。
 
     目录内全部 *.md 在构造时一次性加载；save_entry 落盘的同时更新内存，
-    使自动生成的条目立即生效。
+    使自动生成的条目立即生效。match / entries 访问前会检测目录内文件
+    的新增、删除与内容修改（按文件名 + mtime 快照比对），有变化时自动
+    重新加载，无需重启服务即可使人工维护的条目生效。
     """
 
     def __init__(self, directory: Path):
         self.directory = directory
         self._entries: list[PlaybookEntry] = []
         self._hit_counts: dict[str, int] = {}
+        self._file_snapshot: dict[str, float] = {}
         self.reload()
 
+    def _scan_snapshot(self) -> dict[str, float]:
+        """扫描目录得到 {文件名: mtime} 快照；目录不存在视为空。"""
+        if not self.directory.is_dir():
+            return {}
+        return {p.name: p.stat().st_mtime for p in self.directory.glob("*.md")}
+
     def reload(self) -> None:
-        """重新扫描目录加载条目（目录不存在视为空手册）。"""
+        """重新扫描目录加载条目，并刷新文件快照。"""
         entries: list[PlaybookEntry] = []
         if self.directory.is_dir():
             for path in sorted(self.directory.glob("*.md")):
@@ -136,9 +145,18 @@ class PlaybookStore:
                 if entry is not None:
                     entries.append(entry)
         self._entries = entries
+        self._file_snapshot = self._scan_snapshot()
+
+    def maybe_reload(self) -> None:
+        """目录内文件有新增/删除/修改时自动重新加载。"""
+        snapshot = self._scan_snapshot()
+        if snapshot != self._file_snapshot:
+            logger.info("检测到操作手册目录变更，重新加载条目")
+            self.reload()
 
     @property
     def entries(self) -> list[PlaybookEntry]:
+        self.maybe_reload()
         return list(self._entries)
 
     def match(self, message: str) -> PlaybookEntry | None:
@@ -148,6 +166,7 @@ class PlaybookStore:
         更长的优先（更长的关键词通常语义更具体）；仍相同取先定义者。
         关键词与消息均忽略大小写（对英文关键词生效）。
         """
+        self.maybe_reload()
         msg = message.strip().lower()
         if not msg:
             return None
@@ -180,6 +199,7 @@ class PlaybookStore:
         path.write_text(_serialize_entry(entry), encoding="utf-8")
         self._entries = [e for e in self._entries if e.id != entry.id]
         self._entries.append(entry)
+        self._file_snapshot = self._scan_snapshot()
         return path
 
 

@@ -7,7 +7,7 @@ from pydantic_ai import Agent
 from pydantic_ai.models.test import TestModel
 
 from app.agent import orchestrator
-from app.agent.orchestrator import _TEXT_ONLY_RESULT_TYPES, run_chat
+from app.agent.orchestrator import _TEXT_ONLY_RESULT_TYPES, run_chat, run_chat_stream
 from app.agent.tools import AgentDeps
 
 
@@ -93,3 +93,24 @@ async def test_structured_cards_keep_data(test_agent):
     response = await run_chat("我今天有什么课？", deps)
     assert response.result_type == "schedule"
     assert response.data == raw
+
+
+@pytest.mark.asyncio
+async def test_citations_are_in_regular_and_streaming_responses(test_agent):
+    citation = {
+        "ref": "c1",
+        "type": "map_place",
+        "title": "测试地点",
+        "url": "https://uri.amap.com/navigation?to=113.0,23.0",
+        "data": {"name": "测试地点"},
+    }
+    regular_deps = _deps_with_tool_result("search_map_places", "map_places", {"places": []})
+    regular_deps.citations.append(citation)
+    response = await run_chat("附近有什么？", regular_deps)
+    assert response.citations[0].ref == "c1"
+
+    stream_deps = _deps_with_tool_result("search_map_places", "map_places", {"places": []})
+    stream_deps.citations.append(citation)
+    events = [event async for event in run_chat_stream("附近有什么？", stream_deps)]
+    done = next(event for event in events if event["type"] == "done")
+    assert done["chat"]["citations"][0]["ref"] == "c1"

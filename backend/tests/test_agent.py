@@ -12,6 +12,7 @@ from pydantic_ai.models.test import TestModel
 from app.agent.orchestrator import build_deps
 from app.agent.tools import RESULT_TYPES, AgentDeps, register_tools
 from app.knowledge import KnowledgeService
+from app.schemas.chat import ChatResponse
 
 
 def _build_test_agent() -> Agent:
@@ -100,6 +101,12 @@ def test_build_deps_fields():
     deps = build_deps(None, KnowledgeService(), KnowledgeService())
     assert deps.tool_events == []
     assert deps.last_result_type == "text"
+    assert deps.citations == []
+
+
+def test_chat_response_defaults_citations_for_old_history():
+    response = ChatResponse.model_validate({"answer": "旧回答"})
+    assert response.citations == []
 
 
 def test_search_knowledge_returns_score_and_resource_path(tmp_path):
@@ -157,6 +164,9 @@ def test_search_map_places_tool_records_success(monkeypatch):
     )
 
     assert result["places"][0]["name"] == "清远烧鹅饭店"
+    assert result["places"][0]["citation_ref"] == "c1"
+    assert deps.citations[0]["type"] == "map_place"
+    assert deps.citations[0]["url"].startswith("https://uri.amap.com/navigation?")
     assert deps.last_result_type == "map_places"
     assert deps.tool_events[-1]["ok"] is True
 
@@ -188,7 +198,47 @@ def test_query_map_route_tool_records_success(monkeypatch):
 
     assert result["mode"] == "bicycling"
     assert result["distance_text"] == "1.5 公里"
+    assert result["citation_ref"] == "c1"
+    assert deps.citations[0]["type"] == "map_route"
     assert deps.last_result_type == "map_route"
+
+
+def test_map_citation_refs_are_unique_across_tool_calls(monkeypatch):
+    from app.adapters import amap as amap_adapter
+
+    async def fake_search(keywords, location=None, radius=None, city=None):
+        return {
+            "places": [
+                {"name": "地点甲", "location": "113.01,23.01"},
+                {"name": "地点乙", "location": "113.02,23.02"},
+            ]
+        }
+
+    async def fake_route(destination, mode="walking", origin=None):
+        return {
+            "origin": "学校",
+            "destination": destination,
+            "mode": mode,
+            "navigation_url": "https://uri.amap.com/navigation?to=113.03,23.03",
+        }
+
+    monkeypatch.setattr(amap_adapter, "search_map_places", fake_search)
+    monkeypatch.setattr(amap_adapter, "query_map_route", fake_route)
+    agent = _build_test_agent()
+    deps = AgentDeps()
+    search_tool = agent._function_toolset.tools["search_map_places"]
+    route_tool = agent._function_toolset.tools["query_map_route"]
+
+    places = asyncio.run(
+        search_tool.function(SimpleNamespace(deps=deps), keywords="地点")
+    )
+    route = asyncio.run(
+        route_tool.function(SimpleNamespace(deps=deps), destination="地点甲")
+    )
+
+    assert [item["citation_ref"] for item in places["places"]] == ["c1", "c2"]
+    assert route["citation_ref"] == "c3"
+    assert [item["ref"] for item in deps.citations] == ["c1", "c2", "c3"]
 
 
 def test_map_tools_report_failure_without_error(monkeypatch):

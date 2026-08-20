@@ -16,6 +16,7 @@ const completedChat: ChatData = {
   result_type: "text",
   data: null,
   sources: [],
+  citations: [],
   conversation_id: "page-1",
 };
 

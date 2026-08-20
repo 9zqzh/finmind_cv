@@ -144,6 +144,7 @@ async def run_chat(
         result_type=result_type,
         data=data,
         sources=sources,
+        citations=deps.citations,
         playbook=deps.playbook,
         conversation_id=memory.conversation_id if memory else None,
     )
@@ -259,6 +260,7 @@ async def run_chat_stream(
                         result_type=final_result_type,
                         data=data,
                         sources=sources,
+                        citations=deps.citations,
                         playbook=deps.playbook,
                         conversation_id=memory.conversation_id if memory else None,
                     )

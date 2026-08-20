@@ -210,6 +210,88 @@ svg {
 .markdown-body a {
   color: #1677ff;
 }
+
+.map-citation-link {
+  display: block;
+  margin: 8px 0;
+  color: inherit !important;
+  text-decoration: none;
+  border-radius: 12px;
+  outline: none;
+}
+
+.map-citation-card {
+  overflow: hidden;
+  border-color: #d6e4ff;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ffffff 0%, #f5f9ff 100%);
+  box-shadow: 0 3px 12px rgb(22 119 255 / 8%);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.map-citation-link[href]:hover .map-citation-card,
+.map-citation-link[href]:focus-visible .map-citation-card {
+  transform: translateY(-2px);
+  border-color: #69b1ff;
+  box-shadow: 0 8px 24px rgb(22 119 255 / 16%);
+}
+
+.map-citation-link[href]:focus-visible {
+  box-shadow: 0 0 0 3px rgb(22 119 255 / 20%);
+}
+
+.map-citation-link--disabled {
+  cursor: default;
+}
+
+.map-citation-card__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.map-citation-card__pin {
+  flex: 0 0 auto;
+  color: #1677ff;
+  font-size: 18px;
+}
+
+.map-citation-card__title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.map-citation-card__action {
+  flex: 0 0 auto;
+  color: #1677ff;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.map-citation-card__tags {
+  display: flex;
+  margin-top: 8px;
+}
+
+.map-citation-card__tags .ant-tag {
+  margin-inline-end: 0;
+}
+
+.map-citation-card__meta {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+.map-citation-card__route {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+}
 .markdown-body table {
   border-collapse: collapse;
   margin: 0 0 8px;
@@ -229,6 +311,23 @@ svg {
 }
 
 @media (max-width: 767px) {
+  .map-citation-card__header {
+    align-items: flex-start;
+  }
+
+  .map-citation-card__title {
+    white-space: normal;
+  }
+
+  .map-citation-card__action {
+    margin-top: 2px;
+  }
+
+  .map-citation-card__route {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   body {
     background: #f5f9ff;
   }

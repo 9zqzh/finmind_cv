@@ -30,6 +30,14 @@ export interface ToolCallInfo {
   result_type: string;
 }
 
+export interface CitationInfo {
+  ref: string;
+  type: "map_place" | "map_route";
+  title: string;
+  url: string | null;
+  data: Record<string, unknown>;
+}
+
 export interface ChatData {
   answer: string;
   intent: string;
@@ -37,6 +45,7 @@ export interface ChatData {
   result_type: string;
   data: unknown;
   sources: string[];
+  citations: CitationInfo[];
   conversation_id?: string | null;
 }
 

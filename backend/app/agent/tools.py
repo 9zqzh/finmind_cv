@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Annotated, Any
+from urllib.parse import quote
 
 from pydantic import Field
 from pydantic_ai import Agent, RunContext
@@ -56,12 +57,60 @@ class AgentDeps:
     last_result_type: str = "text"
     last_data: Any = None
     sources: list[str] = field(default_factory=list)
+    citations: list[dict[str, Any]] = field(default_factory=list)
     # 本轮命中的操作手册标题（未命中为 None）
     playbook: str | None = None
 
 
+def _next_citation_ref(deps: AgentDeps) -> str:
+    return f"c{len(deps.citations) + 1}"
+
+
+def _trusted_amap_url(url: Any) -> str | None:
+    value = str(url or "").strip()
+    return value if value.startswith("https://uri.amap.com/") else None
+
+
+def _register_map_citations(deps: AgentDeps, result_type: str, data: Any) -> None:
+    """给地图工具数据注入模型可见的 ref，并登记前端可信卡片载荷。"""
+    if not isinstance(data, dict):
+        return
+    if result_type == "map_places":
+        for place in data.get("places") or []:
+            if not isinstance(place, dict):
+                continue
+            location = str(place.get("location") or "").strip()
+            if "," not in location:
+                continue
+            ref = _next_citation_ref(deps)
+            place["citation_ref"] = ref
+            name = str(place.get("name") or "地点")
+            url = (
+                f"https://uri.amap.com/navigation?to={location},{quote(name)}"
+                "&mode=walk&coordinate=gaode"
+            )
+            deps.citations.append(
+                {"ref": ref, "type": "map_place", "title": name, "url": url, "data": dict(place)}
+            )
+    elif result_type == "map_route":
+        ref = _next_citation_ref(deps)
+        data["citation_ref"] = ref
+        origin = str(data.get("origin") or "起点")
+        destination = str(data.get("destination") or "目的地")
+        deps.citations.append(
+            {
+                "ref": ref,
+                "type": "map_route",
+                "title": f"{origin} → {destination}",
+                "url": _trusted_amap_url(data.get("navigation_url")),
+                "data": dict(data),
+            }
+        )
+
+
 def _record_success(ctx: RunContext[AgentDeps], tool: str, data: Any) -> None:
     result_type = RESULT_TYPES.get(tool, "text")
+    _register_map_citations(ctx.deps, result_type, data)
     ctx.deps.tool_events.append({"tool": tool, "result_type": result_type, "ok": True})
     ctx.deps.last_result_type = result_type
     ctx.deps.last_data = data
@@ -427,7 +476,7 @@ def register_tools(agent: Agent) -> None:
         ),
         city: str = Field(default="清远", description="城市名，用于无坐标时的城市限定搜索"),
     ) -> dict[str, Any]:
-        """搜索地图周边地点（美食、景点、娱乐等），返回地点名称、地址、电话、星级评分、人均消费、距校距离与导航链接。调用时机：用户询问学校周边有什么好吃的/好玩的、想找某类地方（如“学校附近有什么烤肉店”“清远哪里好玩”）。调用后基于返回结果推荐评分高、距离近的地点，用自己的话介绍并附上高德导航链接，不要输出原始 JSON。注意：高德接口只提供星级评分与人均消费、不提供顾客评论文本；本工具结果会以卡片展示，请如实引用数据。"""
+        """搜索地图周边地点（美食、景点、娱乐等），返回地点名称、地址、电话、星级评分、人均消费、距校距离与 citation_ref。调用时机：用户询问学校周边有什么好吃的/好玩的、想找某类地方（如“学校附近有什么烤肉店”“清远哪里好玩”）。调用后基于返回结果推荐评分高、距离近的地点；每个推荐地点必须原样使用其 citation_ref 输出 <citation ref=\"cN\">参考来源：地点名</citation>，由前端渲染地图卡片。不要输出原始 JSON 或自行编造引用编号、链接。注意：高德接口只提供星级评分与人均消费、不提供顾客评论文本。"""
         try:
             data = await amap_adapter.search_map_places(
                 keywords, location=location, radius=radius, city=city
@@ -449,7 +498,7 @@ def register_tools(agent: Agent) -> None:
             description="出行方式：walking 步行 / driving 驾车 / bicycling 骑行 / transit 公交，默认 walking",
         ),
     ) -> dict[str, Any]:
-        """规划从广东金融学院清远校区到目的地的出行路线，返回距离、预计耗时、路线步骤与高德导航链接。调用时机：用户询问去某地怎么走/多远/要多久（如“想去万达广场怎么走”“学校到清远站多远”），或看过 search_map_places 结果后要为某个地点规划路线。出行方式选择：3 公里内建议步行或骑行，更远建议公交或驾车。本工具结果会以卡片展示，请基于返回数据用自己的话说明。"""
+        """规划从广东金融学院清远校区到目的地的出行路线，返回距离、预计耗时、路线步骤与 citation_ref。调用时机：用户询问去某地怎么走/多远/要多久，或看过周边推荐后要规划路线。出行方式选择：3 公里内建议步行或骑行，更远建议公交或驾车。说明路线后必须原样使用 citation_ref 输出 <citation ref=\"cN\">参考来源：路线</citation>，由前端渲染卡片；不要自行编造引用编号或链接。"""
         try:
             data = await amap_adapter.query_map_route(destination, mode=mode)
         except ApiError as exc:

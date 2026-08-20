@@ -19,6 +19,7 @@ import {
 import {
   BulbOutlined,
   DeleteOutlined,
+  EnvironmentOutlined,
   HistoryOutlined,
   LoadingOutlined,
   RobotOutlined,
@@ -29,7 +30,13 @@ import {
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { api, ApiBizError, getToken, handleAuthExpired } from "../api/client";
-import type { ChatData, ConversationSummary, StoredTurn } from "../api/types";
+import type {
+  ChatData,
+  CitationInfo,
+  ConversationSummary,
+  StoredTurn,
+} from "../api/types";
+import { hasResolvedCitation, parseCitationSegments } from "./citationParser";
 import {
   applyStreamSnapshot,
   collapseThinking,
@@ -83,6 +90,91 @@ function amapNavigationUrl(location: string, name?: string) {
   if (!lng || !lat) return null;
   const label = name ? `,${encodeURIComponent(name)}` : "";
   return `https://uri.amap.com/navigation?to=${lng},${lat}${label}&mode=walk&coordinate=gaode`;
+}
+
+/** 只允许打开后端登记的高德 HTTPS URI，拒绝模型文本或异常载荷注入链接。 */
+function trustedAmapUrl(value: string | null | undefined) {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.hostname === "uri.amap.com" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+function MapCitationCard({ citation }: { citation: CitationInfo }) {
+  const data = citation.data as Record<string, any>;
+  const url = trustedAmapUrl(citation.url);
+  const isPlace = citation.type === "map_place";
+  const content = (
+    <Card className="map-citation-card" size="small" bordered>
+      <div className="map-citation-card__header">
+        <EnvironmentOutlined className="map-citation-card__pin" />
+        <Typography.Text strong className="map-citation-card__title">
+          {citation.title}
+        </Typography.Text>
+        <span className="map-citation-card__action">
+          {isPlace ? "查看位置" : "打开导航"} ↗
+        </span>
+      </div>
+      {isPlace ? (
+        <>
+          <Space size={[4, 4]} wrap className="map-citation-card__tags">
+            {ratingTag(Number(data.rating))}
+            {Number(data.cost) > 0 && <Tag color="gold">人均 ¥{data.cost}</Tag>}
+            {Number(data.comment_num) > 0 && <Tag>{data.comment_num} 条点评</Tag>}
+            {formatDistance(Number(data.distance)) && (
+              <Tag color="blue">距中心 {formatDistance(Number(data.distance))}</Tag>
+            )}
+          </Space>
+          {data.address && (
+            <Typography.Text type="secondary" className="map-citation-card__meta">
+              {String(data.address)}
+            </Typography.Text>
+          )}
+        </>
+      ) : (
+        <div className="map-citation-card__route">
+          <Tag color="geekblue">{MODE_LABELS[String(data.mode)] ?? data.mode ?? "路线"}</Tag>
+          <Typography.Text type="secondary">
+            {data.distance_text ?? "距离未知"} · {data.duration_text ?? "耗时未知"}
+          </Typography.Text>
+        </div>
+      )}
+    </Card>
+  );
+
+  return url ? (
+    <a
+      className="map-citation-link"
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      aria-label={`${citation.title}，${isPlace ? "查看位置" : "打开导航"}`}
+    >
+      {content}
+    </a>
+  ) : (
+    <div className="map-citation-link map-citation-link--disabled">{content}</div>
+  );
+}
+
+function CitationMarkdown({ text, citations }: { text: string; citations: CitationInfo[] }) {
+  const segments = parseCitationSegments(text, citations);
+  return (
+    <>
+      {segments.map((segment, index) =>
+        segment.kind === "citation" ? (
+          <MapCitationCard key={`${segment.citation.ref}-${index}`} citation={segment.citation} />
+        ) : (
+          <ReactMarkdown key={`markdown-${index}`} remarkPlugins={[remarkGfm]}>
+            {segment.text}
+          </ReactMarkdown>
+        ),
+      )}
+    </>
+  );
 }
 
 /** 根据后端 result_type 渲染结构化卡片 */
@@ -787,9 +879,7 @@ export default function ChatPage() {
                   <span style={{ whiteSpace: "pre-wrap" }}>{msg.text}</span>
                 ) : msg.text ? (
                   <div className="markdown-body">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {msg.text}
-                    </ReactMarkdown>
+                    <CitationMarkdown text={msg.text} citations={msg.chat?.citations ?? []} />
                   </div>
                 ) : loading && !msg.thinkingContent ? (
                   <Spin indicator={<LoadingOutlined />} tip="FinMind 正在思考..." />
@@ -806,7 +896,9 @@ export default function ChatPage() {
                       ))}
                     </Space>
                   )}
-                  <ResultCard chat={msg.chat} />
+                  {!hasResolvedCitation(msg.text, msg.chat.citations ?? []) && (
+                    <ResultCard chat={msg.chat} />
+                  )}
                   {msg.chat.sources.length > 0 && (
                     <div style={{ marginTop: 6 }}>
                       <Typography.Text type="secondary" style={{ fontSize: 12 }}>

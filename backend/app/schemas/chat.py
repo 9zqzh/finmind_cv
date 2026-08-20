@@ -20,6 +20,18 @@ ResultType = Literal[
     "map_route",
 ]
 
+CitationType = Literal["map_place", "map_route"]
+
+
+class CitationInfo(BaseModel):
+    """AI 正文中引用标签对应的可信结构化数据。"""
+
+    ref: str = Field(..., description="仅在当前回答内有效的不透明引用编号")
+    type: CitationType
+    title: str
+    url: str | None = None
+    data: dict[str, Any] = Field(default_factory=dict)
+
 
 class ToolCallInfo(BaseModel):
     """单次工具调用摘要，便于前端展示"AI 做了什么"。"""
@@ -38,6 +50,9 @@ class ChatResponse(BaseModel):
     result_type: ResultType = Field(default="text")
     data: Any = Field(default=None, description="结构化结果，供前端渲染卡片")
     sources: list[str] = Field(default_factory=list, description="知识来源")
+    citations: list[CitationInfo] = Field(
+        default_factory=list, description="正文 citation 标签对应的结构化引用"
+    )
     playbook: str | None = Field(
         default=None, description="本轮命中的操作手册标题，未命中为空"
     )

@@ -1,6 +1,6 @@
 # 学院教学小助手
 
-面向广东金融学院学生的教学信息助手，整合教务查询、学院官网与竞赛信息、学术资源搜索、本地知识库以及基于 PydanticAI 的自然语言对话。系统包含 React 前端、FastAPI 后端、PostgreSQL 持久化，并可选接入 Chroma 向量检索。
+面向广东金融学院学生的教学信息助手，整合教务查询、学院官网与竞赛信息、学术资源搜索、本地知识库、高德地图周边查询与出行路线规划，以及基于 PydanticAI 的自然语言对话。系统包含 React 前端、FastAPI 后端、PostgreSQL 持久化，并可选接入 Chroma 向量检索（混合检索）。
 
 ## 项目结构
 
@@ -68,11 +68,18 @@ docker compose --profile vector up --build -d
 
 后端会通过 Compose 服务名 `chroma:8000` 连接向量数据库；未启动 Profile 或嵌入配置不完整时会自动回退到关键词检索。
 
-配置完整时启用**混合检索**：向量（Chroma）与关键词双路召回后按 RRF 融合排序，任一路径失败（如嵌入接口超时、配额耗尽）自动降级到另一路，单次故障不会永久关闭向量检索。可通过 `KNOWLEDGE_VECTOR_MIN_SCORE`（默认 0.5，仅过滤语义无关项）与 `KNOWLEDGE_VECTOR_TOP_K`（默认 20）调参。
+配置完整时启用**混合检索**：向量（Chroma）与关键词双路召回后按 RRF 融合排序，任一路径失败（如嵌入接口超时、配额耗尽）自动降级到另一路，单次故障不会永久关闭向量检索。可通过以下变量调参（均可在 `.env` 覆盖）：
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `KNOWLEDGE_VECTOR_MIN_SCORE` | `0.5` | 向量分数阈值，仅过滤语义明显无关项 |
+| `KNOWLEDGE_VECTOR_CONFIDENCE_MIN` | `0.75` | 关键词零命中时向量结果的置信门槛，低于该值视为未检索到 |
+| `KNOWLEDGE_VECTOR_TOP_K` | `20` | 混合检索时向量/关键词各自召回的候选数 |
+| `EMBEDDING_RETRIES` | `2` | 嵌入请求失败时的指数退避重试次数 |
 
 ### 4. 可选地图查询（高德）
 
-在 `.env` 中填写高德开放平台（https://lbs.amap.com ，免费）申请的 Web 服务 Key 后，即可在 AI 对话中使用周边地点查询与路线规划（默认起点为广东金融学院清远校区）：
+在 `.env` 中填写高德开放平台（https://lbs.amap.com ，免费）申请的 Web 服务 Key 后，即可在 AI 对话中使用周边地点查询与路线规划：
 
 ```dotenv
 AMAP_API_KEY=你的高德Web服务Key
@@ -80,7 +87,13 @@ AMAP_API_KEY=你的高德Web服务Key
 BAIDU_MAP_API_KEY=
 ```
 
-未配置 Key 时，Agent 会如实提示地图功能不可用，不影响其他功能。
+支持的功能：
+
+- **周边地点查询**：搜索美食、景点、娱乐等（如“学校周边有什么好吃的”），返回名称、地址、电话、星级评分、人均消费、距中心距离，前端以卡片展示并附高德导航链接；
+- **出行路线规划**：步行 / 驾车 / 骑行 / 公交四种方式，返回距离、预计耗时与导航链接；
+- **默认起点**为广东金融学院清远校区（可用 `AMAP_DEFAULT_ORIGIN` 修改，`AMAP_DEFAULT_LOCATION` 可配置兜底坐标，`AMAP_SEARCH_RADIUS` 配置周边搜索半径，默认 5000 米）。
+
+未配置 Key 时，Agent 会如实提示地图功能不可用，不影响其他功能。高德免费接口仅提供星级评分与人均消费，不包含顾客评论文本；配置 `BAIDU_MAP_API_KEY` 后可补充地点点评数。
 
 ## GitHub Release 自动部署
 
@@ -114,7 +127,7 @@ cd backend
 .venv\Scripts\python -m app.start --reload --port 8000
 ```
 
-根目录 `.env` 同样适用于本地后端。本地模式需要可从宿主机访问的 PostgreSQL，并将 `DATABASE_URL` 指向它；更推荐直接使用完整 Docker 编排。后端启动器会先执行 Alembic 迁移，再启动 Uvicorn。
+根目录 `.env` 同样适用于本地后端。本地模式需要可从宿主机访问的 PostgreSQL，并将 `DATABASE_URL` 指向它；更推荐直接使用完整 Docker 编排。后端启动器会先执行 Alembic 迁移，再启动 Uvicorn。若本机 8000 端口被其他进程占用，可改用其他端口（如 `--port 8001`），并同步修改 `frontend/vite.config.ts` 中的 `/api` 代理 target。
 
 ### 前端
 
@@ -136,8 +149,13 @@ npm run dev
 | `POSTGRES_DB/USER/PASSWORD` | Compose PostgreSQL 配置 |
 | `SESSION_ENCRYPTION_KEYS` | 登录 Cookie 的 Fernet 加密密钥，必填 |
 | `DEEPSEEK_*` | OpenAI 兼容模型配置 |
-| `EMBEDDING_*` | 向量嵌入服务配置 |
+| `EMBEDDING_*` | 向量嵌入服务配置（含 `EMBEDDING_RETRIES` 重试次数） |
 | `KNOWLEDGE_RETRIEVAL_MODE` | `auto` 或 `keyword` |
+| `KNOWLEDGE_VECTOR_MIN_SCORE` | 向量分数阈值，默认 `0.5` |
+| `KNOWLEDGE_VECTOR_CONFIDENCE_MIN` | 关键词零命中时向量置信门槛，默认 `0.75` |
+| `KNOWLEDGE_VECTOR_TOP_K` | 混合检索候选数，默认 `20` |
+| `AMAP_*` | 高德地图配置（Key、默认起点、搜索半径），见上文地图小节 |
+| `BAIDU_MAP_API_KEY` | 可选：百度地图 Key，补充地点点评数 |
 | `ACADEMIC_PROXY` | arXiv、Semantic Scholar 等平台的可选代理 |
 
 ## 测试与构建

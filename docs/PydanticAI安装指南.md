@@ -157,5 +157,5 @@ if __name__ == "__main__":
 ## 九、本项目当前状态（2026-08-07）
 
 - `gduf-jwxt-api==0.2.0` 与 `gduf-web-api==0.2.1` 已声明为后端 PyPI 依赖，安装后端时自动装入；`gduf-academic-api` 仍以本地可编辑模式安装。
-- 后端骨架已搭建完成并实测通过，运行 `.venv\Scripts\python -m pytest` 应有 50 个测试全部通过。
+- 后端骨架已搭建完成并实测通过，运行 `.venv\Scripts\python -m pytest` 即可看到当前全部测试用例通过（数量以仓库最新代码为准）。
 - 后续开发请阅读《docs/后端后续开发操作指南.md》。

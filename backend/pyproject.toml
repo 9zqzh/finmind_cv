@@ -7,7 +7,7 @@ name = "college-assistant-backend"
 version = "0.1.0"
 description = "学院教学小助手 Agent 骨架（PydanticAI + DeepSeek）"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "pydantic-ai>=1.0,<3",
     "pydantic-settings>=2.0",
@@ -21,6 +21,7 @@ dependencies = [
     "cryptography>=45,<51",
     "gduf-jwxt-api==0.3.0",
     "gduf-web-api==0.2.1",
+    "findpapers @ https://github.com/jonatasgrosman/findpapers/archive/3b42b66befa0a64416258e7481201a0253f09e73.tar.gz",
 ]
 
 [project.optional-dependencies]
@@ -38,6 +39,9 @@ tools = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

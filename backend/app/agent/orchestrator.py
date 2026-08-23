@@ -75,7 +75,7 @@ def get_agent(settings: Settings | None = None) -> Agent:
         agent = Agent(
             build_model(settings),
             deps_type=AgentDeps,
-            system_prompt=build_system_prompt(),
+            system_prompt=build_system_prompt(settings=settings),
         )
         register_tools(agent)
         _AGENT = agent

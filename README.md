@@ -8,7 +8,6 @@
 .
 ├── frontend/                   # React + Vite 前端
 ├── backend/                    # FastAPI、Agent、迁移、数据与测试
-├── packages/gduf-academic-api/ # 学术资源聚合客户端
 ├── scripts/                    # 资料转换等维护脚本
 ├── resources/                  # 可浏览、下载的原始资料
 ├── docs/                       # 需求、架构和开发文档
@@ -132,7 +131,6 @@ IMAGE_TAG=latest
 python -m venv backend\.venv
 backend\.venv\Scripts\python -m pip install --upgrade pip
 backend\.venv\Scripts\python -m pip install -e ".\backend[test]"
-backend\.venv\Scripts\python -m pip install -e .\packages\gduf-academic-api
 cd backend
 .venv\Scripts\python -m app.start --reload --port 8000
 ```
@@ -170,16 +168,16 @@ npm run dev
 | `PLAYBOOK_DRAFT_DIR` | 自进化草稿目录，默认 `data/playbook_drafts` |
 | `EVOLUTION_*` | 自进化流水线配置（聚类阈值、窗口、冷却期、定时开关等） |
 | `ADMIN_TOKEN` | 管理台接口令牌（`/api/admin/playbooks/*`），生产环境必填 |
-| `ACADEMIC_PROXY` | arXiv、Semantic Scholar 等平台的可选代理 |
+| `FINDPAPERS_DATABASES` | 启用的学术源，默认 `arxiv,pubmed,semantic_scholar`；OpenAlex/IEEE/Scopus/WoS 启用时需对应 Token |
+| `FINDPAPERS_REQUEST_TIMEOUT_SECONDS` / `FINDPAPERS_SEARCH_TIMEOUT_SECONDS` | 单请求/整次聚合搜索超时，默认 `10` / `30` 秒 |
+| `FINDPAPERS_MAX_RETRIES` / `FINDPAPERS_RATE_LIMIT_RETRIES` | 普通/限流重试次数，默认 `1` / `0` |
+| 其他 `FINDPAPERS_*` | 学术平台代理、SSL、联系邮箱及各数据库 API Token |
 
 ## 测试与构建
 
 ```powershell
 # 后端
 backend\.venv\Scripts\python -m pytest backend\tests
-
-# 内部学术包
-backend\.venv\Scripts\python -m pytest packages\gduf-academic-api\tests -o addopts=""
 
 # 前端
 cd frontend
@@ -202,4 +200,4 @@ npm run build
 - [业务功能说明](docs/业务功能说明.md)
 - [团队本地运行与向量检索指南](docs/团队本地运行与向量检索指南.md)
 - [管理台审核操作指南](docs/管理台审核操作指南.md)
-- [学术资源客户端说明](packages/gduf-academic-api/README.md)
+- [Findpapers 上游文档](https://github.com/jonatasgrosman/findpapers)

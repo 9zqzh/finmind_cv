@@ -1,6 +1,6 @@
 # PydanticAI 安装指南（学院教学小助手）
 
-> 适用环境：Windows + Python 3.10+（本项目使用 Python 3.12）
+> 适用环境：Windows + Python 3.11+（本项目使用 Python 3.12）
 > 参考版本：PydanticAI 2.0（2026-06 稳定版）
 > 更新时间：2026-08-05
 
@@ -8,7 +8,7 @@
 
 ## 一、前置条件
 
-- Python 3.10+（建议 3.12）
+- Python 3.11+（建议 3.12）
 - `pip`（Python 自带）
 - 可访问 PyPI 的网络（国内网络慢时可配置清华镜像，见"常见问题"）
 - DeepSeek API Key（在 [DeepSeek 开放平台](https://platform.deepseek.com) 创建）
@@ -156,6 +156,6 @@ if __name__ == "__main__":
 
 ## 九、本项目当前状态（2026-08-07）
 
-- `gduf-jwxt-api==0.2.0` 与 `gduf-web-api==0.2.1` 已声明为后端 PyPI 依赖，安装后端时自动装入；`gduf-academic-api` 仍以本地可编辑模式安装。
+- `gduf-jwxt-api`、`gduf-web-api` 与固定提交的 Findpapers 均已声明为后端 Python 依赖，安装后端时自动装入。
 - 后端骨架已搭建完成并实测通过，运行 `.venv\Scripts\python -m pytest` 即可看到当前全部测试用例通过（数量以仓库最新代码为准）。
 - 后续开发请阅读《docs/后端后续开发操作指南.md》。

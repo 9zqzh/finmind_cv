@@ -73,9 +73,45 @@ class Settings(BaseSettings):
         default="https://jwxt.gduf.edu.cn", alias="JWXT_BASE_URL"
     )
 
-    # 学术资源平台（arXiv/Semantic Scholar 等境外平台可能需要代理）
-    # 例如：ACADEMIC_PROXY=http://127.0.0.1:7890；留空表示直连
-    academic_proxy: str = Field(default="", alias="ACADEMIC_PROXY")
+    # Findpapers 学术资源聚合搜索
+    # 逗号分隔的启用源；OpenAlex/IEEE/Scopus/WoS 启用时必须同时配置对应 Key。
+    findpapers_databases: str = Field(
+        default="arxiv,pubmed,semantic_scholar", alias="FINDPAPERS_DATABASES"
+    )
+    # 单个 HTTP 请求超时、整次聚合搜索超时，以及普通/429 响应重试次数。
+    findpapers_request_timeout_seconds: float = Field(
+        default=10.0, gt=0, alias="FINDPAPERS_REQUEST_TIMEOUT_SECONDS"
+    )
+    findpapers_search_timeout_seconds: float = Field(
+        default=30.0, gt=0, alias="FINDPAPERS_SEARCH_TIMEOUT_SECONDS"
+    )
+    findpapers_max_retries: int = Field(
+        default=1, ge=0, alias="FINDPAPERS_MAX_RETRIES"
+    )
+    findpapers_rate_limit_retries: int = Field(
+        default=0, ge=0, alias="FINDPAPERS_RATE_LIMIT_RETRIES"
+    )
+    findpapers_ieee_api_token: str = Field(
+        default="", alias="FINDPAPERS_IEEE_API_TOKEN"
+    )
+    findpapers_scopus_api_token: str = Field(
+        default="", alias="FINDPAPERS_SCOPUS_API_TOKEN"
+    )
+    findpapers_pubmed_api_token: str = Field(
+        default="", alias="FINDPAPERS_PUBMED_API_TOKEN"
+    )
+    findpapers_openalex_api_token: str = Field(
+        default="", alias="FINDPAPERS_OPENALEX_API_TOKEN"
+    )
+    findpapers_semantic_scholar_api_token: str = Field(
+        default="", alias="FINDPAPERS_SEMANTIC_SCHOLAR_API_TOKEN"
+    )
+    findpapers_wos_api_token: str = Field(
+        default="", alias="FINDPAPERS_WOS_API_TOKEN"
+    )
+    findpapers_email: str = Field(default="", alias="FINDPAPERS_EMAIL")
+    findpapers_proxy: str = Field(default="", alias="FINDPAPERS_PROXY")
+    findpapers_ssl_verify: bool = Field(default=True, alias="FINDPAPERS_SSL_VERIFY")
 
     # Web 服务
     app_env: str = Field(default="development", alias="APP_ENV")

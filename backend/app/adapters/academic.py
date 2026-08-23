@@ -1,111 +1,232 @@
-"""学术资源平台适配层：隔离 academic_api 与 Agent 工具。
-
-职责（与 adapters/jwxt.py、adapters/gduf_web.py 保持一致的三段式）：
-1. 把 academic_api 的异常映射为统一错误码（ApiError）。
-2. 把 academic_api 的 dataclass 模型转换为可 JSON 序列化的 dict。
-3. 同步 httpx 调用统一包装为 async（asyncio.to_thread），避免阻塞事件循环。
-
-学术平台为公开 API、无需登录，模块内维护共享 AcademicClient 复用连接；
-境外平台访问不稳定时可通过 ACADEMIC_PROXY 环境变量配置代理。
-"""
+"""Findpapers 学术资源适配层：隔离第三方模型与 Agent 工具。"""
 
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Callable, TypeVar
+from collections.abc import Callable
+from datetime import date, datetime
+from typing import Any, TypeVar
 
-from academic_api import (
-    AcademicClient,
-    AcademicError,
-    AcademicSearchResult,
-    NetworkError,
-    ParseError,
-    ValidationError,
+import findpapers
+from findpapers import (
+    ConnectorError,
+    FindpapersError,
+    InvalidParameterError,
+    QueryValidationError,
+    UnsupportedQueryError,
 )
+from findpapers.connectors.connector_base import ConnectorBase
 
-from app.config import get_settings
-from app.schemas.common import (
-    INVALID_PARAM,
-    PARSE_ERROR,
-    UPSTREAM_ERROR,
-    ApiError,
-)
+from app.config import Settings, get_settings
+from app.schemas.common import INVALID_PARAM, UPSTREAM_ERROR, ApiError
 
 T = TypeVar("T")
 
-# 搜索结果单次返回给模型的最大条目数，控制上下文窗口占用
 SEARCH_MAX_ITEMS = 8
-# 摘要进入模型上下文的最大字符数
 ABSTRACT_LIMIT = 200
+SEARCH_WORKERS = 4
+SUPPORTED_DATABASES = frozenset(
+    {"arxiv", "openalex", "pubmed", "semantic_scholar", "ieee", "scopus", "wos"}
+)
+KEY_REQUIRED_DATABASES = {
+    "openalex": "findpapers_openalex_api_token",
+    "ieee": "findpapers_ieee_api_token",
+    "scopus": "findpapers_scopus_api_token",
+    "wos": "findpapers_wos_api_token",
+}
 
-_client: AcademicClient | None = None
+_engine: findpapers.Engine | None = None
 
 
-def get_client() -> AcademicClient:
-    """获取共享的学术资源客户端（懒加载，代理取 ACADEMIC_PROXY 配置）。"""
-    global _client
-    if _client is None or _client.is_closed:
+def _optional(value: str) -> str | None:
+    value = value.strip()
+    return value or None
+
+
+def _configure_findpapers_transport(settings: Settings) -> None:
+    """配置固定版本 Findpapers 未公开为 Engine 参数的请求边界。"""
+    ConnectorBase._timeout = settings.findpapers_request_timeout_seconds
+    ConnectorBase._max_retries = settings.findpapers_max_retries
+    ConnectorBase._max_rate_limit_retries = settings.findpapers_rate_limit_retries
+
+
+def get_enabled_databases(settings: Settings | None = None) -> list[str]:
+    """解析、校验配置的 Findpapers 数据库白名单。"""
+    settings = settings or get_settings()
+    databases = list(
+        dict.fromkeys(
+            part.strip().lower()
+            for part in settings.findpapers_databases.split(",")
+            if part.strip()
+        )
+    )
+    if not databases:
+        raise ApiError(
+            INVALID_PARAM,
+            "FINDPAPERS_DATABASES 至少启用一个数据源",
+            status_code=500,
+        )
+    unknown = sorted(set(databases) - SUPPORTED_DATABASES)
+    if unknown:
+        raise ApiError(
+            INVALID_PARAM,
+            f"FINDPAPERS_DATABASES 包含未知数据源：{'、'.join(unknown)}",
+            status_code=500,
+        )
+    missing_keys = [
+        database
+        for database in databases
+        if database in KEY_REQUIRED_DATABASES
+        and not _optional(str(getattr(settings, KEY_REQUIRED_DATABASES[database])))
+    ]
+    if missing_keys:
+        raise ApiError(
+            INVALID_PARAM,
+            f"已启用但未配置 API Key 的数据源：{'、'.join(missing_keys)}",
+            status_code=500,
+        )
+    return databases
+
+
+def _resolve_databases(settings: Settings, sources: list[str] | None) -> list[str]:
+    enabled = get_enabled_databases(settings)
+    if sources is None:
+        return enabled
+    requested = list(
+        dict.fromkeys(source.strip().lower() for source in sources if source.strip())
+    )
+    if not requested:
+        raise ApiError(INVALID_PARAM, "sources 至少包含一个数据源", status_code=400)
+    disabled = sorted(set(requested) - set(enabled))
+    if disabled:
+        raise ApiError(
+            INVALID_PARAM,
+            f"请求的数据源未在 FINDPAPERS_DATABASES 中启用：{'、'.join(disabled)}",
+            status_code=400,
+        )
+    return requested
+
+
+def get_engine() -> findpapers.Engine:
+    """获取共享的 Findpapers Engine，并注入项目统一配置。"""
+    global _engine
+    if _engine is None:
         settings = get_settings()
-        proxy = settings.academic_proxy.strip() or None
-        _client = AcademicClient(timeout=25.0, proxy=proxy)
-    return _client
+        _configure_findpapers_transport(settings)
+        _engine = findpapers.Engine(
+            ieee_api_key=_optional(settings.findpapers_ieee_api_token),
+            scopus_api_key=_optional(settings.findpapers_scopus_api_token),
+            pubmed_api_key=_optional(settings.findpapers_pubmed_api_token),
+            openalex_api_key=_optional(settings.findpapers_openalex_api_token),
+            semantic_scholar_api_key=_optional(
+                settings.findpapers_semantic_scholar_api_token
+            ),
+            wos_api_key=_optional(settings.findpapers_wos_api_token),
+            email=_optional(settings.findpapers_email),
+            proxy=_optional(settings.findpapers_proxy),
+            ssl_verify=settings.findpapers_ssl_verify,
+        )
+    return _engine
 
 
-def reset_client() -> None:
-    """关闭并重置共享客户端（供测试或应用关闭时调用）。"""
-    global _client
-    if _client is not None and not _client.is_closed:
-        _client.close()
-    _client = None
+def reset_engine() -> None:
+    """重置共享 Engine（供配置切换和测试使用）。"""
+    global _engine
+    _engine = None
 
 
-def translate_academic_error(exc: AcademicError) -> ApiError:
-    """把学术包异常转换为带统一错误码的 ApiError。"""
-    if isinstance(exc, ValidationError):
+def translate_findpapers_error(exc: FindpapersError) -> ApiError:
+    """把 Findpapers 异常转换为项目统一的 ApiError。"""
+    if isinstance(
+        exc, (QueryValidationError, UnsupportedQueryError, InvalidParameterError)
+    ):
         return ApiError(INVALID_PARAM, str(exc), status_code=400)
-    if isinstance(exc, ParseError):
-        return ApiError(PARSE_ERROR, f"学术平台响应解析失败：{exc}", status_code=502)
-    if isinstance(exc, NetworkError):
+    if isinstance(exc, ConnectorError):
         return ApiError(UPSTREAM_ERROR, f"学术平台请求失败：{exc}", status_code=502)
     return ApiError(UPSTREAM_ERROR, f"学术资源检索失败：{exc}", status_code=502)
 
 
-async def run_academic(func: Callable[[], T]) -> T:
-    """在线程中执行同步学术 API 调用，并统一转换异常。"""
+async def run_findpapers(func: Callable[[], T], timeout_seconds: float) -> T:
+    """在线程中执行同步 Findpapers 调用，并统一转换异常。"""
     try:
-        return await asyncio.to_thread(func)
-    except AcademicError as exc:
-        raise translate_academic_error(exc) from exc
+        return await asyncio.wait_for(asyncio.to_thread(func), timeout=timeout_seconds)
+    except TimeoutError as exc:
+        raise ApiError(
+            UPSTREAM_ERROR,
+            f"学术资源检索超过 {timeout_seconds:g} 秒，已停止等待",
+            status_code=504,
+        ) from exc
+    except FindpapersError as exc:
+        raise translate_findpapers_error(exc) from exc
 
 
-def shape_search_result(result: AcademicSearchResult) -> dict[str, Any]:
-    """把 AcademicSearchResult 精简为供模型总结的紧凑结构。
+def _author_name(author: Any) -> str:
+    if isinstance(author, dict):
+        return str(author.get("name") or "").strip()
+    return str(getattr(author, "name", author) or "").strip()
 
-    只保留标题/作者/年份/链接/下载入口，摘要进一步压缩，
-    截断到 SEARCH_MAX_ITEMS 条，避免大量结构化数据挤占上下文窗口。
-    """
-    items = []
-    for item in result.items[:SEARCH_MAX_ITEMS]:
-        abstract = " ".join(item.abstract.split())
+
+def _publication_year(publication_date: Any) -> int | None:
+    if isinstance(publication_date, (date, datetime)):
+        return publication_date.year
+    if publication_date:
+        try:
+            return int(str(publication_date)[:4])
+        except ValueError:
+            pass
+    return None
+
+
+def _source_names(paper: Any) -> list[str]:
+    values = getattr(paper, "found_in", None) or []
+    return sorted({str(value).strip() for value in values if str(value).strip()})
+
+
+def shape_search_result(result: Any) -> dict[str, Any]:
+    """把 SearchResult 精简为供模型总结的兼容结构。"""
+    papers = list(getattr(result, "papers", None) or [])
+    items: list[dict[str, Any]] = []
+    for paper in papers[:SEARCH_MAX_ITEMS]:
+        abstract = " ".join(str(getattr(paper, "abstract", None) or "").split())
         if len(abstract) > ABSTRACT_LIMIT:
             abstract = abstract[:ABSTRACT_LIMIT] + "..."
+        authors = [
+            name
+            for name in (
+                _author_name(author)
+                for author in (getattr(paper, "authors", None) or [])
+            )
+            if name
+        ]
         items.append(
             {
-                "title": item.title,
-                "authors": item.authors,
-                "year": item.published_year,
-                "source": item.source,
-                "url": item.url,
-                "pdf_url": item.pdf_url,
+                "title": str(getattr(paper, "title", "")),
+                "authors": authors,
+                "year": _publication_year(getattr(paper, "publication_date", None)),
+                "source": ", ".join(_source_names(paper)),
+                "url": getattr(paper, "url", None),
+                "pdf_url": getattr(paper, "pdf_url", None),
                 "abstract": abstract,
             }
         )
+
+    failed_databases = list(getattr(result, "failed_databases", None) or [])
     return {
-        "query": result.query,
-        "total": result.total,
+        "query": str(getattr(result, "query", "")),
+        "total": len(papers),
         "results": items,
-        "platform_messages": result.messages,
+        "platform_messages": [
+            f"{database}：搜索失败" for database in failed_databases
+        ],
     }
+
+
+def _all_databases_failed(result: Any) -> bool:
+    if getattr(result, "papers", None):
+        return False
+    databases = set(getattr(result, "databases", None) or [])
+    failed = set(getattr(result, "failed_databases", None) or [])
+    return bool(databases) and databases <= failed
 
 
 async def search_academic_resources(
@@ -113,9 +234,38 @@ async def search_academic_resources(
     sources: list[str] | None = None,
     max_results: int = 5,
 ) -> dict[str, Any]:
-    """跨平台搜索学术资源（arXiv、Semantic Scholar 等）。"""
-    client = get_client()
-    result = await run_academic(
-        lambda: client.search(query, sources=sources, max_results=max_results)
+    """使用 Findpapers 跨平台搜索论文与文献。"""
+    settings = get_settings()
+    databases = _resolve_databases(settings, sources)
+    engine = get_engine()
+    result = await run_findpapers(
+        lambda: engine.search(
+            query,
+            databases=databases,
+            max_papers_per_database=max_results,
+            num_workers=SEARCH_WORKERS,
+            show_progress=False,
+            enrichment_databases=[],
+        ),
+        timeout_seconds=settings.findpapers_search_timeout_seconds,
     )
+    if _all_databases_failed(result):
+        failed = "、".join(getattr(result, "failed_databases", None) or [])
+        raise ApiError(
+            UPSTREAM_ERROR,
+            f"学术平台请求全部失败：{failed}",
+            status_code=502,
+        )
     return shape_search_result(result)
+
+
+__all__ = [
+    "ABSTRACT_LIMIT",
+    "SEARCH_MAX_ITEMS",
+    "get_engine",
+    "get_enabled_databases",
+    "reset_engine",
+    "search_academic_resources",
+    "shape_search_result",
+    "translate_findpapers_error",
+]

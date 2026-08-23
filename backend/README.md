@@ -21,7 +21,6 @@ backend/
 ```powershell
 python -m venv backend\.venv
 backend\.venv\Scripts\python -m pip install -e ".\backend[test]"
-backend\.venv\Scripts\python -m pip install -e .\packages\gduf-academic-api
 cd backend
 .venv\Scripts\python -m app.start --reload --port 8000
 ```

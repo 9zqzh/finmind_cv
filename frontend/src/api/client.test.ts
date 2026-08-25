@@ -58,13 +58,21 @@ describe("session expiration", () => {
     },
   );
 
-  it("ignores unrelated errors and anonymous requests", () => {
+  it("ignores unrelated errors", () => {
     const listener = vi.fn();
     const unsubscribe = onAuthExpired(listener);
 
     expect(handleAuthExpired("UPSTREAM_ERROR")).toBe(false);
-    expect(handleAuthExpired("SESSION_EXPIRED")).toBe(false);
     expect(listener).not.toHaveBeenCalled();
+    unsubscribe();
+  });
+
+  it("refreshes auth state even if another request already cleared the token", () => {
+    const listener = vi.fn();
+    const unsubscribe = onAuthExpired(listener);
+
+    expect(handleAuthExpired("SESSION_EXPIRED")).toBe(true);
+    expect(listener).toHaveBeenCalledOnce();
     unsubscribe();
   });
 });

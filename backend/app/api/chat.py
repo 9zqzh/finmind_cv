@@ -77,9 +77,13 @@ async def chat_stream(
                 elif ev_type == "done":
                     yield f"event: done\ndata: {json.dumps(event['chat'], ensure_ascii=False)}\n\n"
                 elif ev_type == "error":
-                    yield f"event: error\ndata: {json.dumps(event['message'], ensure_ascii=False)}\n\n"
+                    payload = {
+                        "message": event["message"],
+                        **({"code": event["code"]} if event.get("code") else {}),
+                    }
+                    yield f"event: error\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
         except Exception as exc:
-            yield f"event: error\ndata: {json.dumps(str(exc), ensure_ascii=False)}\n\n"
+            yield f"event: error\ndata: {json.dumps({'message': str(exc)}, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(
         event_stream(),

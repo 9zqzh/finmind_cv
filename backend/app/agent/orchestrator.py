@@ -119,6 +119,13 @@ async def run_chat(
     except TimeoutError as exc:
         raise ApiError(MODEL_ERROR, "模型响应超时，请稍后重试", status_code=504) from exc
 
+    if deps.auth_error:
+        raise ApiError(
+            deps.auth_error["code"],
+            deps.auth_error["message"],
+            status_code=401,
+        )
+
     answer = str(result.output)
     tool_calls = [
         ToolCallInfo(
@@ -213,7 +220,7 @@ async def run_chat_stream(
     - tool_result: {"type": "tool_result", "tool_name": str, "status": "ok"}
     - text: {"type": "text", "content": str}
     - done: {"type": "done", "chat": ChatResponse dict}
-    - error: {"type": "error", "message": str}
+    - error: {"type": "error", "message": str, "code"?: str}
     """
     settings = settings or get_settings()
     agent = get_agent(settings)
@@ -233,6 +240,9 @@ async def run_chat_stream(
                     yield {"type": "tool_call", "tool_name": ev.part.tool_name}
                 elif isinstance(ev, FunctionToolResultEvent):
                     yield {"type": "tool_result", "tool_name": ev.part.tool_name, "status": "ok"}
+                    if deps.auth_error:
+                        yield {"type": "error", **deps.auth_error}
+                        return
                 elif isinstance(ev, PartDeltaEvent) and isinstance(ev.delta, TextPartDelta):
                     yield {"type": "text", "content": ev.delta.content_delta}
                 elif isinstance(ev, AgentRunResultEvent):

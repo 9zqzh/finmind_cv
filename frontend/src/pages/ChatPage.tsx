@@ -671,8 +671,14 @@ export default function ChatPage() {
               thinkingExpanded = false;
               break;
             }
-            case "error":
-              throw new Error(JSON.parse(data));
+            case "error": {
+              const payload = JSON.parse(data) as string | { code?: string; message?: string };
+              const code = typeof payload === "string" ? undefined : payload.code;
+              const message =
+                typeof payload === "string" ? payload : payload.message ?? "对话请求失败";
+              handleAuthExpired(code);
+              throw new ApiBizError(code ?? "UNKNOWN", message);
+            }
           }
         }
       };

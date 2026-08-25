@@ -97,6 +97,30 @@ def test_login_guard_returns_error_dict(tmp_path):
     assert exc_info.value.code == AUTH_REQUIRED
 
 
+def test_academic_tool_records_session_expiration(monkeypatch):
+    """聊天中的教务会话失效必须保留错误码，供 SSE 通知前端退出。"""
+    from app.adapters import jwxt as jwxt_adapter
+    from app.schemas.common import SESSION_EXPIRED, ApiError
+
+    async def fake_expired(*args, **kwargs):
+        raise ApiError(SESSION_EXPIRED, "教务登录已过期", status_code=401)
+
+    monkeypatch.setattr(jwxt_adapter, "get_schedule", fake_expired)
+    agent = _build_test_agent()
+    tool = agent._function_toolset.tools["query_schedule"]
+    deps = AgentDeps()
+
+    result = asyncio.run(
+        tool.function(SimpleNamespace(deps=deps), term="2025-2026-2", week=None)
+    )
+
+    assert result == {"error": "教务登录已过期"}
+    assert deps.auth_error == {
+        "code": SESSION_EXPIRED,
+        "message": "教务登录已过期",
+    }
+
+
 def test_build_deps_fields():
     deps = build_deps(None, KnowledgeService(), KnowledgeService())
     assert deps.tool_events == []

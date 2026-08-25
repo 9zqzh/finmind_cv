@@ -41,7 +41,7 @@ export function onAuthExpired(listener: () => void) {
 
 /** 统一处理普通请求与流式请求返回的会话失效错误。 */
 export function handleAuthExpired(code: string | undefined): boolean {
-  if (!code || !AUTH_EXPIRED_CODES.has(code) || !getToken()) {
+  if (!code || !AUTH_EXPIRED_CODES.has(code)) {
     return false;
   }
   setToken(null);

@@ -20,7 +20,7 @@ from app.adapters import amap as amap_adapter
 from app.adapters import gduf_web as gduf_web_adapter
 from app.adapters import jwxt as jwxt_adapter
 from app.knowledge import KnowledgeService
-from app.schemas.common import ApiError
+from app.schemas.common import AUTH_REQUIRED, SESSION_EXPIRED, ApiError
 from app.services.session import JwxtSession
 
 # 工具名 -> 前端结果卡片类型
@@ -60,6 +60,8 @@ class AgentDeps:
     citations: list[dict[str, Any]] = field(default_factory=list)
     # 本轮命中的操作手册标题（未命中为 None）
     playbook: str | None = None
+    # 教务会话在工具调用过程中失效时，交给编排层透传给客户端。
+    auth_error: dict[str, str] | None = None
 
 
 def _next_citation_ref(deps: AgentDeps) -> str:
@@ -116,10 +118,17 @@ def _record_success(ctx: RunContext[AgentDeps], tool: str, data: Any) -> None:
     ctx.deps.last_data = data
 
 
-def _record_failure(ctx: RunContext[AgentDeps], tool: str, message: str) -> dict[str, Any]:
+def _record_failure(
+    ctx: RunContext[AgentDeps],
+    tool: str,
+    message: str,
+    code: str | None = None,
+) -> dict[str, Any]:
     ctx.deps.tool_events.append(
         {"tool": tool, "result_type": "text", "ok": False, "error": message}
     )
+    if code in {AUTH_REQUIRED, SESSION_EXPIRED}:
+        ctx.deps.auth_error = {"code": code, "message": message}
     return {"error": message}
 
 
@@ -140,7 +149,7 @@ def register_tools(agent: Agent) -> None:
         try:
             data = await jwxt_adapter.get_schedule(ctx.deps.session, term, week)
         except ApiError as exc:
-            return _record_failure(ctx, "query_schedule", exc.message)
+            return _record_failure(ctx, "query_schedule", exc.message, exc.code)
         _record_success(ctx, "query_schedule", data)
         return data
 
@@ -166,7 +175,7 @@ def register_tools(agent: Agent) -> None:
                 end_week=end_week,
             )
         except ApiError as exc:
-            return _record_failure(ctx, "query_classroom_schedule", exc.message)
+            return _record_failure(ctx, "query_classroom_schedule", exc.message, exc.code)
         _record_success(ctx, "query_classroom_schedule", data)
         return data
 
@@ -198,7 +207,7 @@ def register_tools(agent: Agent) -> None:
                 end_period=end_period,
             )
         except ApiError as exc:
-            return _record_failure(ctx, "query_empty_classrooms", exc.message)
+            return _record_failure(ctx, "query_empty_classrooms", exc.message, exc.code)
         _record_success(ctx, "query_empty_classrooms", data)
         return data
 
@@ -214,7 +223,7 @@ def register_tools(agent: Agent) -> None:
         try:
             data = await jwxt_adapter.get_grades(ctx.deps.session, term)
         except ApiError as exc:
-            return _record_failure(ctx, "query_grades", exc.message)
+            return _record_failure(ctx, "query_grades", exc.message, exc.code)
         _record_success(ctx, "query_grades", data)
         return data
 
@@ -232,7 +241,7 @@ def register_tools(agent: Agent) -> None:
         try:
             data = await jwxt_adapter.get_grade_detail(ctx.deps.session, index)
         except ApiError as exc:
-            return _record_failure(ctx, "query_grade_detail", exc.message)
+            return _record_failure(ctx, "query_grade_detail", exc.message, exc.code)
         _record_success(ctx, "query_grade_detail", data)
         return data
 
@@ -242,7 +251,7 @@ def register_tools(agent: Agent) -> None:
         try:
             data = await jwxt_adapter.get_training_plan(ctx.deps.session)
         except ApiError as exc:
-            return _record_failure(ctx, "query_training_plan", exc.message)
+            return _record_failure(ctx, "query_training_plan", exc.message, exc.code)
         _record_success(ctx, "query_training_plan", data)
         return data
 

@@ -113,9 +113,22 @@ async def test_login_session_is_hashed_encrypted_and_restorable(tmp_path, monkey
     async with factory() as db:
         await manager.persist_login(login, db)
         record = await db.scalar(select(AuthSession))
+        user = await db.scalar(select(User).where(User.student_number == "20260003"))
+        assert user is not None
+        assert user.visit_count == 1
         assert record.token_hash == hashlib.sha256(b"raw-browser-token").hexdigest()
         assert "upstream-secret" not in record.encrypted_cookies
         assert cipher.decrypt(record.encrypted_cookies)["JSESSIONID"] == "upstream-secret"
+
+        second_login = JwxtSession(
+            token="second-browser-token",
+            client=client,
+            username="20260003",
+        )
+        await manager.persist_login(second_login, db)
+        await db.refresh(user)
+        assert user.visit_count == 2
+        assert user.last_login_at is not None
 
     monkeypatch.setattr("app.services.session.JwxtClient", FakeClient)
     restored_manager = SessionManager(settings, cipher)

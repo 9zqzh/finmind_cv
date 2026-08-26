@@ -45,6 +45,11 @@ export const adminApi = {
     httpClient.get<ApiEnvelope<PagedData<AdminUserItem>>>("/api/admin/users", {
       params: { page, page_size: pageSize, q },
     }).then(unwrap),
+  exportUsers: (q = "") =>
+    httpClient.get<Blob>("/api/admin/users/export", {
+      params: { q },
+      responseType: "blob",
+    }),
   userConversations: (userId: string, page = 1, pageSize = 20) =>
     httpClient.get<ApiEnvelope<AdminConversationList>>(
       `/api/admin/users/${userId}/conversations`,

@@ -235,6 +235,7 @@ export interface AdminUserItem {
   student_number: string;
   created_at: string;
   last_login_at: string;
+  visit_count: number;
   last_active_at: string | null;
   has_active_session: boolean;
   conversation_count: number;

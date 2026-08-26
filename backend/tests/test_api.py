@@ -128,7 +128,20 @@ def test_admin_uses_user_session_and_super_admin_controls_grants(client):
         json={"student_number": "20260002"},
     )
     assert granted.status_code == 200
-    assert client.get("/api/admin/users", headers=normal_headers).status_code == 200
+    users = client.get("/api/admin/users", headers=normal_headers)
+    assert users.status_code == 200
+    assert all("visit_count" in item for item in users.json()["data"]["items"])
+
+    exported = client.get(
+        "/api/admin/users/export",
+        headers=normal_headers,
+        params={"q": "20260002"},
+    )
+    assert exported.status_code == 200
+    assert exported.headers["content-type"].startswith("text/csv")
+    assert "attachment" in exported.headers["content-disposition"]
+    assert exported.content.startswith(b"\xef\xbb\xbf")
+    assert "20260002" in exported.content.decode("utf-8-sig")
     assert client.post(
         "/api/admin/admins",
         headers=normal_headers,

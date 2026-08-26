@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
 from jwxtapi import GradeReport, JwxtClient, RequestError, SessionExpiredError
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -134,7 +134,7 @@ class SessionManager:
         now = _utcnow()
         user = await db.scalar(select(User).where(User.student_number == session.username))
         if user is None:
-            user = User(student_number=session.username, last_login_at=now)
+            user = User(student_number=session.username, last_login_at=now, visit_count=1)
             db.add(user)
             try:
                 await db.flush()
@@ -143,9 +143,17 @@ class SessionManager:
                 user = await db.scalar(select(User).where(User.student_number == session.username))
                 if user is None:
                     raise
-                user.last_login_at = now
+                await db.execute(
+                    update(User)
+                    .where(User.id == user.id)
+                    .values(last_login_at=now, visit_count=User.visit_count + 1)
+                )
         else:
-            user.last_login_at = now
+            await db.execute(
+                update(User)
+                .where(User.id == user.id)
+                .values(last_login_at=now, visit_count=User.visit_count + 1)
+            )
         db.add(
             AuthSession(
                 user_id=user.id,

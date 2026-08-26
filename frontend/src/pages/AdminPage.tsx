@@ -6,7 +6,7 @@ import {
 } from "antd";
 import {
   ArrowLeftOutlined, CheckOutlined, CloseOutlined, ReloadOutlined,
-  ThunderboltOutlined, UserAddOutlined,
+  DownloadOutlined, ThunderboltOutlined, UserAddOutlined,
 } from "@ant-design/icons";
 import { adminApi } from "../api/adminApi";
 import { ApiBizError } from "../api/client";
@@ -32,6 +32,7 @@ const EVENT_LABELS: Record<string, string> = {
   "admin.grant": "添加管理员",
   "admin.revoke": "取消管理员",
   "admin.conversation.view": "查看对话",
+  "admin.users.export": "导出用户数据",
   "playbook.evolve": "触发进化",
   "playbook.approve": "通过草稿",
   "playbook.reject": "拒绝草稿",
@@ -46,6 +47,7 @@ export default function AdminPage() {
   const [userPage, setUserPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
   const [userQuery, setUserQuery] = useState("");
+  const [exportingUsers, setExportingUsers] = useState(false);
 
   const [admins, setAdmins] = useState<AdminGrantItem[]>([]);
   const [newAdmin, setNewAdmin] = useState("");
@@ -122,6 +124,25 @@ export default function AdminPage() {
     finally { setLoading(false); }
   };
 
+  const exportUsers = async () => {
+    setExportingUsers(true);
+    try {
+      const response = await adminApi.exportUsers(userQuery);
+      const disposition = response.headers["content-disposition"] as string | undefined;
+      const filename = disposition?.match(/filename="?([^";]+)"?/)?.[1] ?? "users.csv";
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      message.success(`已导出 ${users?.total ?? 0} 条用户数据`);
+    } catch (error) { message.error(errorMessage(error, "导出用户数据失败")); }
+    finally { setExportingUsers(false); }
+  };
+
   const openConversation = async (id: string) => {
     setLoading(true);
     try { setConversationDetail(await adminApi.conversation(id)); }
@@ -184,6 +205,7 @@ export default function AdminPage() {
         onChange={(e) => setSearchInput(e.target.value)}
         onSearch={(q) => { setUserQuery(q.trim()); setUserPage(1); loadUsers(1, q.trim()); }} />
       <Button icon={<ReloadOutlined />} onClick={() => loadUsers()}>刷新</Button>
+      <Button icon={<DownloadOutlined />} loading={exportingUsers} onClick={exportUsers}>导出数据</Button>
     </Space>}
     pagination={{ current: userPage, pageSize: PAGE_SIZE, total: users?.total ?? 0,
       showSizeChanger: false, onChange: (page) => { setUserPage(page); loadUsers(page); } }}
@@ -191,6 +213,7 @@ export default function AdminPage() {
       { title: "学号", dataIndex: "student_number" },
       { title: "最近登录", dataIndex: "last_login_at", render: time },
       { title: "最近活跃", dataIndex: "last_active_at", render: time },
+      { title: "访问次数", dataIndex: "visit_count", width: 100 },
       { title: "会话状态", dataIndex: "has_active_session", render: (active: boolean) => active ? <Tag color="green">有效</Tag> : <Tag>离线</Tag> },
       { title: "对话数", dataIndex: "conversation_count", width: 90 },
       { title: "操作", render: (_: unknown, row: AdminUserItem) => <Button type="link" onClick={() => openUser(row)}>查看对话</Button> },

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import csv
+import io
 from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -195,12 +198,79 @@ async def list_users(
             "student_number": user.student_number,
             "created_at": user.created_at,
             "last_login_at": user.last_login_at,
+            "visit_count": user.visit_count,
             "last_active_at": active,
             "has_active_session": bool(active_count),
             "conversation_count": int(conversations or 0),
         } for user, active, active_count, conversations in rows],
         "page": page, "page_size": page_size, "total": int(total or 0),
     })
+
+
+@router.get("/users/export")
+async def export_users(
+    request: Request,
+    q: str = Query("", max_length=64),
+    admin: AdminContext = Depends(get_required_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Export all user statistics matching the current student-number filter."""
+    now = datetime.now(timezone.utc)
+    filters = [User.student_number.ilike(f"%{q.strip()}%")] if q.strip() else []
+    last_active = (
+        select(func.max(AuthSession.last_active_at))
+        .where(AuthSession.user_id == User.id)
+        .correlate(User).scalar_subquery()
+    )
+    active_sessions = (
+        select(func.count(AuthSession.id))
+        .where(
+            AuthSession.user_id == User.id,
+            AuthSession.revoked_at.is_(None),
+            AuthSession.expires_at > now,
+        ).correlate(User).scalar_subquery()
+    )
+    conversation_count = (
+        select(func.count(Conversation.id))
+        .where(Conversation.user_id == User.id)
+        .correlate(User).scalar_subquery()
+    )
+    rows = (await db.execute(
+        select(User, last_active, active_sessions, conversation_count)
+        .where(*filters)
+        .order_by(User.last_login_at.desc(), User.id.desc())
+    )).all()
+
+    output = io.StringIO(newline="")
+    writer = csv.writer(output)
+    writer.writerow(["学号", "首次访问时间", "最近登录时间", "访问次数", "最近活跃时间", "会话状态", "对话数"])
+    for user, active, active_count, conversations in rows:
+        writer.writerow([
+            user.student_number,
+            user.created_at.isoformat(),
+            user.last_login_at.isoformat(),
+            user.visit_count,
+            active.isoformat() if active else "",
+            "有效" if active_count else "离线",
+            int(conversations or 0),
+        ])
+
+    await write_audit_safely(
+        db,
+        request,
+        event_type="admin.users.export",
+        success=True,
+        actor_user_id=admin.session.user_id,
+        actor_student_number=admin.session.username,
+        target_type="users",
+        details={"query": q.strip(), "row_count": len(rows)},
+    )
+    filename = f"users-{datetime.now().strftime('%Y%m%d-%H%M%S')}.csv"
+    return Response(
+        content=output.getvalue().encode("utf-8-sig"),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/users/{user_id}/conversations")

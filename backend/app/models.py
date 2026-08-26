@@ -25,6 +25,7 @@ class User(Base):
     student_number: Mapped[str] = mapped_column(String(64), unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     last_login_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    visit_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     sessions: Mapped[list[AuthSession]] = relationship(back_populates="user")
     conversations: Mapped[list[Conversation]] = relationship(back_populates="user")

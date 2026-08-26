@@ -9,7 +9,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from jwxtapi import GradeReport, JwxtClient, RequestError, SessionExpiredError
 from sqlalchemy import select, update
@@ -24,6 +24,11 @@ from app.services.crypto import CookieCipher
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def local_today() -> date:
+    """Business day used by the China-based application for daily active users."""
+    return datetime.now(timezone(timedelta(hours=8))).date()
 
 
 def _token_hash(token: str) -> str:
@@ -132,9 +137,15 @@ class SessionManager:
         if not session.username or not session.client.is_logged_in:
             raise ValueError("only authenticated sessions can be persisted")
         now = _utcnow()
+        today = local_today()
         user = await db.scalar(select(User).where(User.student_number == session.username))
         if user is None:
-            user = User(student_number=session.username, last_login_at=now, visit_count=1)
+            user = User(
+                student_number=session.username,
+                last_login_at=now,
+                visit_count=1,
+                last_visit_on=today,
+            )
             db.add(user)
             try:
                 await db.flush()
@@ -146,14 +157,16 @@ class SessionManager:
                 await db.execute(
                     update(User)
                     .where(User.id == user.id)
-                    .values(last_login_at=now, visit_count=User.visit_count + 1)
+                    .values(last_login_at=now)
                 )
+                await self._mark_daily_visit(user.id, today, db)
         else:
             await db.execute(
                 update(User)
                 .where(User.id == user.id)
-                .values(last_login_at=now, visit_count=User.visit_count + 1)
+                .values(last_login_at=now)
             )
+            await self._mark_daily_visit(user.id, today, db)
         db.add(
             AuthSession(
                 user_id=user.id,
@@ -166,6 +179,30 @@ class SessionManager:
         await db.commit()
         session.user_id = user.id
         session.persistent = True
+
+    async def record_daily_visit(self, session: JwxtSession, db: AsyncSession) -> bool:
+        """Count at most one authenticated visit per user per Shanghai calendar day."""
+        if session.user_id is None or not session.is_logged_in:
+            return False
+        changed = await self._mark_daily_visit(session.user_id, local_today(), db)
+        await db.commit()
+        return changed
+
+    async def _mark_daily_visit(
+        self, user_id: uuid.UUID, today: date, db: AsyncSession
+    ) -> bool:
+        result = await db.execute(
+            update(User)
+            .where(
+                User.id == user_id,
+                (User.last_visit_on.is_(None)) | (User.last_visit_on < today),
+            )
+            .values(
+                last_visit_on=today,
+                visit_count=User.visit_count + 1,
+            )
+        )
+        return bool(result.rowcount)
 
     async def sync_cookies(self, session: JwxtSession, db: AsyncSession) -> None:
         if not session.persistent:

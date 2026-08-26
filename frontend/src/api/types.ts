@@ -236,9 +236,14 @@ export interface AdminUserItem {
   created_at: string;
   last_login_at: string;
   visit_count: number;
+  last_visit_on: string | null;
   last_active_at: string | null;
   has_active_session: boolean;
   conversation_count: number;
+}
+
+export interface AdminUserList extends PagedData<AdminUserItem> {
+  daily_active_users: number;
 }
 
 export interface PagedData<T> {

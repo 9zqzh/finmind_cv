@@ -116,6 +116,8 @@ def test_admin_uses_user_session_and_super_admin_controls_grants(client):
 
     normal_headers = _authenticated_headers("20260002")
     assert client.get("/api/admin/admins", headers=normal_headers).status_code == 403
+    assert client.get("/api/auth/status", headers=normal_headers).status_code == 200
+    assert client.get("/api/auth/status", headers=normal_headers).status_code == 200
 
     super_headers = _authenticated_headers("20260001")
     listed = client.get("/api/admin/admins", headers=super_headers)
@@ -131,6 +133,12 @@ def test_admin_uses_user_session_and_super_admin_controls_grants(client):
     users = client.get("/api/admin/users", headers=normal_headers)
     assert users.status_code == 200
     assert all("visit_count" in item for item in users.json()["data"]["items"])
+    assert users.json()["data"]["daily_active_users"] >= 1
+    normal_user = next(
+        item for item in users.json()["data"]["items"]
+        if item["student_number"] == "20260002"
+    )
+    assert normal_user["visit_count"] == 1
 
     exported = client.get(
         "/api/admin/users/export",

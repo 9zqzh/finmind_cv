@@ -13,7 +13,7 @@ import { ApiBizError } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import type {
   AdminConversationDetail, AdminConversationList, AdminDraft, AdminEvolveResult,
-  AdminGrantItem, AdminPlaybookList, AdminUserItem, AuditLogItem, PagedData,
+  AdminGrantItem, AdminPlaybookList, AdminUserItem, AdminUserList, AuditLogItem, PagedData,
 } from "../api/types";
 
 const PAGE_SIZE = 20;
@@ -43,7 +43,7 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState("users");
   const [loading, setLoading] = useState(false);
 
-  const [users, setUsers] = useState<PagedData<AdminUserItem> | null>(null);
+  const [users, setUsers] = useState<AdminUserList | null>(null);
   const [userPage, setUserPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
   const [userQuery, setUserQuery] = useState("");
@@ -201,6 +201,7 @@ export default function AdminPage() {
   const usersPanel = <Table
     rowKey="id" loading={loading} dataSource={users?.items ?? []}
     title={() => <Space wrap>
+      <Tag color="blue">今日活跃 {users?.daily_active_users ?? 0} 人</Tag>
       <Input.Search placeholder="按学号搜索" value={searchInput} allowClear
         onChange={(e) => setSearchInput(e.target.value)}
         onSearch={(q) => { setUserQuery(q.trim()); setUserPage(1); loadUsers(1, q.trim()); }} />
@@ -213,7 +214,7 @@ export default function AdminPage() {
       { title: "学号", dataIndex: "student_number" },
       { title: "最近登录", dataIndex: "last_login_at", render: time },
       { title: "最近活跃", dataIndex: "last_active_at", render: time },
-      { title: "访问次数", dataIndex: "visit_count", width: 100 },
+      { title: "累计活跃天数", dataIndex: "visit_count", width: 120 },
       { title: "会话状态", dataIndex: "has_active_session", render: (active: boolean) => active ? <Tag color="green">有效</Tag> : <Tag>离线</Tag> },
       { title: "对话数", dataIndex: "conversation_count", width: 90 },
       { title: "操作", render: (_: unknown, row: AdminUserItem) => <Button type="link" onClick={() => openUser(row)}>查看对话</Button> },

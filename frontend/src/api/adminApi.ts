@@ -6,7 +6,7 @@ import type {
   AdminEvolveResult,
   AdminGrantItem,
   AdminPlaybookList,
-  AdminUserItem,
+  AdminUserList,
   ApiEnvelope,
   AuditLogItem,
   PagedData,
@@ -42,7 +42,7 @@ export const adminApi = {
       `/api/admin/admins/${encodeURIComponent(studentNumber)}`,
     ).then(unwrap),
   users: (page = 1, pageSize = 20, q = "") =>
-    httpClient.get<ApiEnvelope<PagedData<AdminUserItem>>>("/api/admin/users", {
+    httpClient.get<ApiEnvelope<AdminUserList>>("/api/admin/users", {
       params: { page, page_size: pageSize, q },
     }).then(unwrap),
   exportUsers: (q = "") =>

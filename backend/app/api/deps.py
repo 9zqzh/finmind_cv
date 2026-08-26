@@ -50,6 +50,8 @@ async def get_optional_session(
 ) -> AsyncIterator[JwxtSession | None]:
     manager = get_session_manager(request)
     session = await manager.get(x_session_token, db)
+    if session is not None and session.is_logged_in:
+        await manager.record_daily_visit(session, db)
     try:
         yield session
     finally:
@@ -64,6 +66,7 @@ async def get_required_session(
 ) -> AsyncIterator[JwxtSession]:
     manager = get_session_manager(request)
     session = require_login(await manager.get(x_session_token, db))
+    await manager.record_daily_visit(session, db)
     try:
         yield session
     finally:

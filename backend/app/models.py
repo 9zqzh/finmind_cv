@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -26,6 +26,7 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     last_login_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     visit_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    last_visit_on: Mapped[date | None] = mapped_column(Date(), nullable=True, index=True)
 
     sessions: Mapped[list[AuthSession]] = relationship(back_populates="user")
     conversations: Mapped[list[Conversation]] = relationship(back_populates="user")

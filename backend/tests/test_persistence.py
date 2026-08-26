@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 import hashlib
+from datetime import date
 
 import pytest
 from cryptography.fernet import Fernet
@@ -127,7 +128,18 @@ async def test_login_session_is_hashed_encrypted_and_restorable(tmp_path, monkey
         )
         await manager.persist_login(second_login, db)
         await db.refresh(user)
+        assert user.visit_count == 1
+
+        monkeypatch.setattr("app.services.session.local_today", lambda: date(2099, 1, 2))
+        third_login = JwxtSession(
+            token="third-browser-token",
+            client=client,
+            username="20260003",
+        )
+        await manager.persist_login(third_login, db)
+        await db.refresh(user)
         assert user.visit_count == 2
+        assert user.last_visit_on == date(2099, 1, 2)
         assert user.last_login_at is not None
 
     monkeypatch.setattr("app.services.session.JwxtClient", FakeClient)

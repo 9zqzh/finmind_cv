@@ -20,6 +20,7 @@ from app.db import get_db
 from app.models import AdminGrant, AuditLog, AuthSession, Conversation, ConversationTurn, User
 from app.schemas.common import CONFLICT, INVALID_PARAM, NOT_FOUND, ApiError, ok
 from app.services.admin import add_audit_event, write_audit_safely
+from app.services.session import local_today
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -192,6 +193,11 @@ async def list_users(
         .offset((page - 1) * page_size).limit(page_size)
     )).all()
     total = await db.scalar(select(func.count()).select_from(User).where(*filters))
+    daily_active_users = await db.scalar(
+        select(func.count()).select_from(User).where(
+            User.last_visit_on == local_today()
+        )
+    )
     return ok({
         "items": [{
             "id": user.id,
@@ -199,11 +205,13 @@ async def list_users(
             "created_at": user.created_at,
             "last_login_at": user.last_login_at,
             "visit_count": user.visit_count,
+            "last_visit_on": user.last_visit_on,
             "last_active_at": active,
             "has_active_session": bool(active_count),
             "conversation_count": int(conversations or 0),
         } for user, active, active_count, conversations in rows],
         "page": page, "page_size": page_size, "total": int(total or 0),
+        "daily_active_users": int(daily_active_users or 0),
     })
 
 
@@ -243,13 +251,14 @@ async def export_users(
 
     output = io.StringIO(newline="")
     writer = csv.writer(output)
-    writer.writerow(["学号", "首次访问时间", "最近登录时间", "访问次数", "最近活跃时间", "会话状态", "对话数"])
+    writer.writerow(["学号", "首次访问时间", "最近登录时间", "累计活跃天数", "最近活跃日期", "最近活跃时间", "会话状态", "对话数"])
     for user, active, active_count, conversations in rows:
         writer.writerow([
             user.student_number,
             user.created_at.isoformat(),
             user.last_login_at.isoformat(),
             user.visit_count,
+            user.last_visit_on.isoformat() if user.last_visit_on else "",
             active.isoformat() if active else "",
             "有效" if active_count else "离线",
             int(conversations or 0),

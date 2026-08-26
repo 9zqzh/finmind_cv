@@ -3,9 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getToken,
   handleAuthExpired,
+  httpClient,
   onAuthExpired,
   setToken,
 } from "./client";
+import { adminApi } from "./adminApi";
 
 class MemoryStorage implements Storage {
   private values = new Map<string, string>();
@@ -74,5 +76,28 @@ describe("session expiration", () => {
     expect(handleAuthExpired("SESSION_EXPIRED")).toBe(true);
     expect(listener).toHaveBeenCalledOnce();
     unsubscribe();
+  });
+
+  it("uses the shared user session for admin requests", async () => {
+    setToken("user-session-token");
+    const originalAdapter = httpClient.defaults.adapter;
+    let sessionHeader: unknown;
+    httpClient.defaults.adapter = async (config) => {
+      sessionHeader = config.headers.get("X-Session-Token");
+      return {
+        data: { success: true, data: { items: [], can_manage: false }, message: null },
+        status: 200,
+        statusText: "OK",
+        headers: {},
+        config,
+      };
+    };
+
+    try {
+      await adminApi.admins();
+      expect(sessionHeader).toBe("user-session-token");
+    } finally {
+      httpClient.defaults.adapter = originalAdapter;
+    }
   });
 });

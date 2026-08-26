@@ -62,7 +62,7 @@ export default function LoginPage() {
         captcha: values.captcha,
       });
       setToken(data.session_token);
-      markLoggedIn(data.username);
+      markLoggedIn(data.username, data.is_admin, data.is_super_admin);
       message.success(`欢迎回来，${data.username}`);
       navigate("/", { replace: true });
     } catch (error) {

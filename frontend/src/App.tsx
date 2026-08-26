@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { Spin } from "antd";
+import { Button, Result, Spin } from "antd";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import AppLayout from "./layout/AppLayout";
 import LoginPage from "./pages/LoginPage";
@@ -28,6 +28,18 @@ function ProtectedLayout() {
   return <AppLayout />;
 }
 
+function ProtectedAdmin() {
+  const { loggedIn, isAdmin, loading } = useAuth();
+  if (loading) {
+    return <div style={{ display: "flex", justifyContent: "center", paddingTop: 120 }}><Spin /></div>;
+  }
+  if (!loggedIn) return <Navigate to="/login" replace />;
+  if (!isAdmin) {
+    return <Result status="403" title="无管理权限" subTitle="当前学号未被授权为管理员。" extra={<Button href="/">返回助手</Button>} />;
+  }
+  return <AdminPage />;
+}
+
 export default function App() {
   useEffect(() => { preloadCompetitionData(); preloadInformationData(); }, []);
 
@@ -36,8 +48,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          {/* 管理台独立于学生登录体系，通过 ADMIN_TOKEN 鉴权 */}
-          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin" element={<ProtectedAdmin />} />
           <Route element={<ProtectedLayout />}>
             <Route path="/" element={<ChatPage />} />
             <Route path="/academic-info" element={<AcademicInfoPage />} />

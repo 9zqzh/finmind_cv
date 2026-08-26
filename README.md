@@ -167,7 +167,7 @@ npm run dev
 | `PLAYBOOK_DIR` | 操作手册目录，默认 `data/playbooks` |
 | `PLAYBOOK_DRAFT_DIR` | 自进化草稿目录，默认 `data/playbook_drafts` |
 | `EVOLUTION_*` | 自进化流水线配置（聚类阈值、窗口、冷却期、定时开关等） |
-| `ADMIN_TOKEN` | 管理台接口令牌（`/api/admin/playbooks/*`），生产环境必填 |
+| `INITIAL_ADMIN_STUDENT_NUMBER` | 管理后台初始管理员学号；留空时后台禁用 |
 | `FINDPAPERS_DATABASES` | 启用的学术源，默认 `arxiv,pubmed,semantic_scholar`；OpenAlex/IEEE/Scopus/WoS 启用时需对应 Token |
 | `FINDPAPERS_REQUEST_TIMEOUT_SECONDS` / `FINDPAPERS_SEARCH_TIMEOUT_SECONDS` | 单请求/整次聚合搜索超时，默认 `10` / `30` 秒 |
 | `FINDPAPERS_MAX_RETRIES` / `FINDPAPERS_RATE_LIMIT_RETRIES` | 普通/限流重试次数，默认 `1` / `0` |
@@ -189,6 +189,7 @@ npm run build
 
 - `backend/data/knowledge/` 与 `backend/data/information/` 是可检索的结构化资料；`resources/` 保存原始 PDF、Word、Excel 等文件。
 - 教务密码和验证码不会持久化；登录 Cookie 加密后存入 PostgreSQL，数据库中只保存会话令牌摘要。
+- 管理后台复用用户登录会话；管理员授权、登录结果、草稿审核和对话详情访问写入结构化审计日志。
 - 前端和 API 通过 Nginx 同源访问；SSE 流式对话已关闭代理缓冲。
 - `docker compose down` 不删除命名卷；只有显式添加 `-v` 才会删除持久化数据。
 

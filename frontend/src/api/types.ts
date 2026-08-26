@@ -17,11 +17,15 @@ export interface LoginData {
   session_token: string;
   username: string;
   success: boolean;
+  is_admin: boolean;
+  is_super_admin: boolean;
 }
 
 export interface AuthStatus {
   logged_in: boolean;
   username: string | null;
+  is_admin: boolean;
+  is_super_admin: boolean;
 }
 
 export interface ToolCallInfo {
@@ -217,4 +221,54 @@ export interface AdminEvolveDraft {
 export interface AdminEvolveResult {
   clusters_found: number;
   drafts: AdminEvolveDraft[];
+}
+
+export interface AdminGrantItem {
+  student_number: string;
+  is_super_admin: boolean;
+  granted_by_student_number: string | null;
+  created_at: string | null;
+}
+
+export interface AdminUserItem {
+  id: string;
+  student_number: string;
+  created_at: string;
+  last_login_at: string;
+  last_active_at: string | null;
+  has_active_session: boolean;
+  conversation_count: number;
+}
+
+export interface PagedData<T> {
+  items: T[];
+  page: number;
+  page_size: number;
+  total: number;
+}
+
+export interface AdminConversationList extends PagedData<ConversationSummary> {
+  user: { id: string; student_number: string };
+}
+
+export interface AdminConversationDetail {
+  user: { id: string; student_number: string };
+  conversation: ConversationSummary;
+  turns: StoredTurn[];
+  has_more: boolean;
+}
+
+export interface AuditLogItem {
+  id: string;
+  event_type: string;
+  success: boolean;
+  actor_student_number: string | null;
+  target_student_number: string | null;
+  target_type: string | null;
+  target_id: string | null;
+  error_code: string | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  details: Record<string, unknown>;
+  created_at: string;
 }

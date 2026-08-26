@@ -1,357 +1,297 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  Alert,
-  Button,
-  Card,
-  Empty,
-  Input,
-  List,
-  message,
-  Popconfirm,
-  Space,
-  Spin,
-  Table,
-  Tabs,
-  Tag,
-  Typography,
+  Alert, Button, Card, Descriptions, Drawer, Empty, Input, List, message,
+  Popconfirm, Select, Space, Spin, Table, Tabs, Tag, Typography,
 } from "antd";
 import {
-  ArrowLeftOutlined,
-  CheckOutlined,
-  CloseOutlined,
-  ReloadOutlined,
-  ThunderboltOutlined,
+  ArrowLeftOutlined, CheckOutlined, CloseOutlined, ReloadOutlined,
+  ThunderboltOutlined, UserAddOutlined,
 } from "@ant-design/icons";
-import { AdminApiError, adminApi, getAdminToken, setAdminToken } from "../api/adminApi";
-import type { AdminDraft, AdminEvolveResult, AdminPlaybookList } from "../api/types";
+import { adminApi } from "../api/adminApi";
+import { ApiBizError } from "../api/client";
+import { useAuth } from "../context/AuthContext";
+import type {
+  AdminConversationDetail, AdminConversationList, AdminDraft, AdminEvolveResult,
+  AdminGrantItem, AdminPlaybookList, AdminUserItem, AuditLogItem, PagedData,
+} from "../api/types";
 
-/** 统一错误文案；令牌无效时给出明确提示。 */
-function errMsg(error: unknown, fallback: string): string {
-  if (error instanceof AdminApiError) {
-    if (error.code === "AUTH_REQUIRED") {
-      return "管理员令牌无效，请核对页面顶部填写的令牌与服务器 ADMIN_TOKEN";
-    }
-    return error.message;
-  }
-  return fallback;
+const PAGE_SIZE = 20;
+
+function errorMessage(error: unknown, fallback: string) {
+  return error instanceof ApiBizError ? error.message : fallback;
 }
 
-const SOURCE_TAG: Record<string, { label: string; color: string }> = {
-  manual: { label: "人工维护", color: "blue" },
-  auto: { label: "自动生成", color: "green" },
+function time(value: string | null | undefined) {
+  return value ? new Date(value).toLocaleString("zh-CN", { hour12: false }) : "—";
+}
+
+const EVENT_LABELS: Record<string, string> = {
+  "auth.login": "用户登录",
+  "auth.logout": "用户退出",
+  "admin.grant": "添加管理员",
+  "admin.revoke": "取消管理员",
+  "admin.conversation.view": "查看对话",
+  "playbook.evolve": "触发进化",
+  "playbook.approve": "通过草稿",
+  "playbook.reject": "拒绝草稿",
 };
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState("drafts");
+  const { isSuperAdmin } = useAuth();
+  const [activeTab, setActiveTab] = useState("users");
+  const [loading, setLoading] = useState(false);
+
+  const [users, setUsers] = useState<PagedData<AdminUserItem> | null>(null);
+  const [userPage, setUserPage] = useState(1);
+  const [searchInput, setSearchInput] = useState("");
+  const [userQuery, setUserQuery] = useState("");
+
+  const [admins, setAdmins] = useState<AdminGrantItem[]>([]);
+  const [newAdmin, setNewAdmin] = useState("");
+  const [adminActing, setAdminActing] = useState(false);
+
+  const [logs, setLogs] = useState<PagedData<AuditLogItem> | null>(null);
+  const [logPage, setLogPage] = useState(1);
+  const [logEvent, setLogEvent] = useState<string | undefined>();
+  const [logStudent, setLogStudent] = useState("");
+
+  const [conversationList, setConversationList] = useState<AdminConversationList | null>(null);
+  const [conversationDetail, setConversationDetail] = useState<AdminConversationDetail | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
   const [drafts, setDrafts] = useState<AdminDraft[]>([]);
-  const [draftsLoading, setDraftsLoading] = useState(false);
   const [playbooks, setPlaybooks] = useState<AdminPlaybookList | null>(null);
-  const [playbooksLoading, setPlaybooksLoading] = useState(false);
+  const [actingId, setActingId] = useState<string | null>(null);
   const [evolving, setEvolving] = useState(false);
   const [evolveResult, setEvolveResult] = useState<AdminEvolveResult | null>(null);
-  const [actingId, setActingId] = useState<string | null>(null);
 
-  const loadDrafts = useCallback(async () => {
-    setDraftsLoading(true);
-    try {
-      const data = await adminApi.drafts();
-      setDrafts(data.drafts);
-    } catch (error) {
-      message.error(errMsg(error, "获取草稿列表失败"));
-    } finally {
-      setDraftsLoading(false);
-    }
+  const loadUsers = useCallback(async (page = userPage, q = userQuery) => {
+    setLoading(true);
+    try { setUsers(await adminApi.users(page, PAGE_SIZE, q)); }
+    catch (error) { message.error(errorMessage(error, "获取用户列表失败")); }
+    finally { setLoading(false); }
+  }, [userPage, userQuery]);
+
+  const loadAdmins = useCallback(async () => {
+    setLoading(true);
+    try { setAdmins((await adminApi.admins()).items); }
+    catch (error) { message.error(errorMessage(error, "获取管理员列表失败")); }
+    finally { setLoading(false); }
   }, []);
+
+  const loadLogs = useCallback(async (page = logPage) => {
+    setLoading(true);
+    try {
+      setLogs(await adminApi.auditLogs({
+        page, page_size: PAGE_SIZE,
+        ...(logEvent ? { event_type: logEvent } : {}),
+        ...(logStudent.trim() ? { student_number: logStudent.trim() } : {}),
+      }));
+    } catch (error) { message.error(errorMessage(error, "获取审计日志失败")); }
+    finally { setLoading(false); }
+  }, [logEvent, logPage, logStudent]);
 
   const loadPlaybooks = useCallback(async () => {
-    setPlaybooksLoading(true);
+    setLoading(true);
     try {
-      setPlaybooks(await adminApi.playbooks());
-    } catch (error) {
-      message.error(errMsg(error, "获取手册列表失败"));
-    } finally {
-      setPlaybooksLoading(false);
-    }
+      const [draftData, playbookData] = await Promise.all([adminApi.drafts(), adminApi.playbooks()]);
+      setDrafts(draftData.drafts);
+      setPlaybooks(playbookData);
+    } catch (error) { message.error(errorMessage(error, "获取操作手册数据失败")); }
+    finally { setLoading(false); }
   }, []);
 
-  useEffect(() => {
-    loadDrafts();
-    loadPlaybooks();
-  }, [loadDrafts, loadPlaybooks]);
+  useEffect(() => { loadUsers(1, ""); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleApprove = async (draft: AdminDraft) => {
+  const selectTab = (key: string) => {
+    setActiveTab(key);
+    if (key === "users") loadUsers();
+    else if (key === "admins") loadAdmins();
+    else if (key === "logs") loadLogs();
+    else if (["drafts", "playbooks", "evolve"].includes(key)) loadPlaybooks();
+  };
+
+  const openUser = async (user: AdminUserItem) => {
+    setLoading(true);
+    setConversationDetail(null);
+    try {
+      setConversationList(await adminApi.userConversations(user.id));
+      setDrawerOpen(true);
+    } catch (error) { message.error(errorMessage(error, "获取用户对话失败")); }
+    finally { setLoading(false); }
+  };
+
+  const openConversation = async (id: string) => {
+    setLoading(true);
+    try { setConversationDetail(await adminApi.conversation(id)); }
+    catch (error) { message.error(errorMessage(error, "获取对话详情失败")); }
+    finally { setLoading(false); }
+  };
+
+  const loadEarlierTurns = async () => {
+    if (!conversationDetail?.turns.length) return;
+    setLoading(true);
+    try {
+      const older = await adminApi.conversation(
+        conversationDetail.conversation.id,
+        conversationDetail.turns[0].position,
+      );
+      setConversationDetail({
+        ...conversationDetail,
+        turns: [...older.turns, ...conversationDetail.turns],
+        has_more: older.has_more,
+      });
+    } catch (error) { message.error(errorMessage(error, "获取更早对话失败")); }
+    finally { setLoading(false); }
+  };
+
+  const grantAdmin = async () => {
+    if (!/^\d{4,64}$/.test(newAdmin.trim())) {
+      message.warning("请输入 4 至 64 位数字学号"); return;
+    }
+    setAdminActing(true);
+    try {
+      await adminApi.grantAdmin(newAdmin.trim());
+      setNewAdmin(""); message.success("管理员授权已添加"); await loadAdmins();
+    } catch (error) { message.error(errorMessage(error, "添加管理员失败")); }
+    finally { setAdminActing(false); }
+  };
+
+  const revokeAdmin = async (studentNumber: string) => {
+    setAdminActing(true);
+    try {
+      await adminApi.revokeAdmin(studentNumber);
+      message.success("管理员授权已取消"); await loadAdmins();
+    } catch (error) { message.error(errorMessage(error, "取消管理员失败")); }
+    finally { setAdminActing(false); }
+  };
+
+  const reviewDraft = async (draft: AdminDraft, approve: boolean) => {
     setActingId(draft.id);
     try {
-      await adminApi.approve(draft.id);
-      message.success(`《${draft.title}》已审核通过，立即对用户对话生效`);
-      loadDrafts();
-      loadPlaybooks();
-    } catch (error) {
-      message.error(errMsg(error, "审核失败"));
-    } finally {
-      setActingId(null);
-    }
+      if (approve) await adminApi.approve(draft.id); else await adminApi.reject(draft.id);
+      message.success(approve ? "草稿已通过并立即生效" : "草稿已拒绝删除");
+      await loadPlaybooks();
+    } catch (error) { message.error(errorMessage(error, "审核失败")); }
+    finally { setActingId(null); }
   };
 
-  const handleReject = async (draft: AdminDraft) => {
-    setActingId(draft.id);
-    try {
-      await adminApi.reject(draft.id);
-      message.success(`《${draft.title}》已拒绝并删除`);
-      loadDrafts();
-    } catch (error) {
-      message.error(errMsg(error, "审核失败"));
-    } finally {
-      setActingId(null);
-    }
-  };
+  const usersPanel = <Table
+    rowKey="id" loading={loading} dataSource={users?.items ?? []}
+    title={() => <Space wrap>
+      <Input.Search placeholder="按学号搜索" value={searchInput} allowClear
+        onChange={(e) => setSearchInput(e.target.value)}
+        onSearch={(q) => { setUserQuery(q.trim()); setUserPage(1); loadUsers(1, q.trim()); }} />
+      <Button icon={<ReloadOutlined />} onClick={() => loadUsers()}>刷新</Button>
+    </Space>}
+    pagination={{ current: userPage, pageSize: PAGE_SIZE, total: users?.total ?? 0,
+      showSizeChanger: false, onChange: (page) => { setUserPage(page); loadUsers(page); } }}
+    columns={[
+      { title: "学号", dataIndex: "student_number" },
+      { title: "最近登录", dataIndex: "last_login_at", render: time },
+      { title: "最近活跃", dataIndex: "last_active_at", render: time },
+      { title: "会话状态", dataIndex: "has_active_session", render: (active: boolean) => active ? <Tag color="green">有效</Tag> : <Tag>离线</Tag> },
+      { title: "对话数", dataIndex: "conversation_count", width: 90 },
+      { title: "操作", render: (_: unknown, row: AdminUserItem) => <Button type="link" onClick={() => openUser(row)}>查看对话</Button> },
+    ]}
+  />;
 
-  const handleEvolve = async () => {
-    setEvolving(true);
-    setEvolveResult(null);
-    try {
-      const result = await adminApi.evolve();
-      setEvolveResult(result);
-      message.success(`进化完成：发现 ${result.clusters_found} 个高频问题簇`);
-      loadDrafts();
-    } catch (error) {
-      message.error(errMsg(error, "进化失败"));
-    } finally {
-      setEvolving(false);
-    }
-  };
+  const adminsPanel = <Space direction="vertical" style={{ width: "100%" }} size="middle">
+    {isSuperAdmin && <Card size="small" title="预授权管理员">
+      <Space.Compact style={{ maxWidth: 440, width: "100%" }}>
+        <Input value={newAdmin} onChange={(e) => setNewAdmin(e.target.value.trim())} placeholder="输入学号，可在首次登录前授权" />
+        <Button type="primary" icon={<UserAddOutlined />} loading={adminActing} onClick={grantAdmin}>添加</Button>
+      </Space.Compact>
+    </Card>}
+    {!isSuperAdmin && <Alert showIcon type="info" message="只有配置中的初始管理员可以增删管理员。" />}
+    <Table rowKey="student_number" loading={loading} dataSource={admins} pagination={false} columns={[
+      { title: "学号", dataIndex: "student_number" },
+      { title: "角色", dataIndex: "is_super_admin", render: (superAdmin: boolean) => <Tag color={superAdmin ? "gold" : "blue"}>{superAdmin ? "初始管理员" : "管理员"}</Tag> },
+      { title: "授权人", dataIndex: "granted_by_student_number", render: (v: string | null) => v ?? "配置文件" },
+      { title: "授权时间", dataIndex: "created_at", render: time },
+      ...(isSuperAdmin ? [{ title: "操作", render: (_: unknown, row: AdminGrantItem) => row.is_super_admin ? null : <Popconfirm title={`取消 ${row.student_number} 的管理员权限？`} onConfirm={() => revokeAdmin(row.student_number)}><Button danger type="link" loading={adminActing}>取消授权</Button></Popconfirm> }] : []),
+    ]} />
+  </Space>;
 
-  const draftsPanel = (
-    <Spin spinning={draftsLoading}>
-      {drafts.length === 0 && !draftsLoading ? (
-        <Empty description="暂无待审草稿。可在“触发进化”页签手动跑一次进化流水线。" />
-      ) : (
-        <List
-          grid={{ gutter: 16, column: 1 }}
-          dataSource={drafts}
-          renderItem={(draft) => (
-            <List.Item>
-              <Card
-                title={draft.title}
-                extra={
-                  <Space>
-                    <Button
-                      type="primary"
-                      icon={<CheckOutlined />}
-                      loading={actingId === draft.id}
-                      onClick={() => handleApprove(draft)}
-                    >
-                      通过
-                    </Button>
-                    <Popconfirm
-                      title="拒绝该草稿？"
-                      description="草稿将被删除，同簇问题冷却期内不会重复生成。"
-                      onConfirm={() => handleReject(draft)}
-                      okText="拒绝"
-                      cancelText="取消"
-                      okButtonProps={{ danger: true }}
-                    >
-                      <Button danger icon={<CloseOutlined />} loading={actingId === draft.id}>
-                        拒绝
-                      </Button>
-                    </Popconfirm>
-                  </Space>
-                }
-              >
-                <Space wrap style={{ marginBottom: 8 }}>
-                  <Tag color="purple">提问簇大小 {draft.cluster_count}</Tag>
-                  {draft.keywords.map((k) => (
-                    <Tag key={k}>{k}</Tag>
-                  ))}
-                </Space>
-                {draft.warnings && draft.warnings !== "无" && (
-                  <Alert
-                    type="warning"
-                    showIcon
-                    message={`校验警告：${draft.warnings}`}
-                    style={{ marginBottom: 8 }}
-                  />
-                )}
-                <pre
-                  style={{
-                    background: "#f6f8fa",
-                    borderRadius: 6,
-                    padding: 12,
-                    maxHeight: 320,
-                    overflow: "auto",
-                    whiteSpace: "pre-wrap",
-                    fontSize: 13,
-                    margin: 0,
-                  }}
-                >
-                  {draft.instructions}
-                </pre>
-              </Card>
-            </List.Item>
-          )}
-        />
-      )}
-    </Spin>
-  );
+  const logsPanel = <Table
+    rowKey="id" loading={loading} dataSource={logs?.items ?? []}
+    title={() => <Space wrap>
+      <Select allowClear placeholder="事件类型" style={{ width: 160 }} value={logEvent} onChange={setLogEvent}
+        options={Object.entries(EVENT_LABELS).map(([value, label]) => ({ value, label }))} />
+      <Input placeholder="操作者或目标学号" value={logStudent} onChange={(e) => setLogStudent(e.target.value)} style={{ width: 190 }} />
+      <Button type="primary" onClick={() => { setLogPage(1); loadLogs(1); }}>筛选</Button>
+    </Space>}
+    expandable={{ expandedRowRender: (row) => <Descriptions size="small" column={1} bordered items={[
+      { key: "ip", label: "IP", children: row.ip_address ?? "—" },
+      { key: "ua", label: "User-Agent", children: row.user_agent ?? "—" },
+      { key: "target", label: "目标", children: `${row.target_type ?? "—"} / ${row.target_id ?? "—"}` },
+      { key: "details", label: "详情", children: <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>{JSON.stringify(row.details, null, 2)}</pre> },
+    ]} /> }}
+    pagination={{ current: logPage, pageSize: PAGE_SIZE, total: logs?.total ?? 0,
+      showSizeChanger: false, onChange: (page) => { setLogPage(page); loadLogs(page); } }}
+    columns={[
+      { title: "时间", dataIndex: "created_at", render: time },
+      { title: "事件", dataIndex: "event_type", render: (v: string) => EVENT_LABELS[v] ?? v },
+      { title: "结果", dataIndex: "success", render: (v: boolean) => <Tag color={v ? "green" : "red"}>{v ? "成功" : "失败"}</Tag> },
+      { title: "操作者", dataIndex: "actor_student_number", render: (v: string | null) => v ?? "—" },
+      { title: "目标学号", dataIndex: "target_student_number", render: (v: string | null) => v ?? "—" },
+      { title: "错误码", dataIndex: "error_code", render: (v: string | null) => v ?? "—" },
+    ]}
+  />;
 
-  const playbooksPanel = (
-    <Spin spinning={playbooksLoading}>
-      <Table
-        rowKey="id"
-        dataSource={playbooks?.entries ?? []}
-        pagination={false}
-        expandable={{
-          expandedRowRender: (entry) => (
-            <pre
-              style={{
-                background: "#f6f8fa",
-                borderRadius: 6,
-                padding: 12,
-                whiteSpace: "pre-wrap",
-                fontSize: 13,
-                margin: 0,
-              }}
-            >
-              {entry.instructions}
-            </pre>
-          ),
-        }}
-        columns={[
-          { title: "手册标题", dataIndex: "title", key: "title" },
-          {
-            title: "来源",
-            dataIndex: "source",
-            key: "source",
-            width: 110,
-            render: (source: string) => {
-              const tag = SOURCE_TAG[source] ?? { label: source, color: "default" };
-              return <Tag color={tag.color}>{tag.label}</Tag>;
-            },
-          },
-          {
-            title: "触发关键词",
-            dataIndex: "keywords",
-            key: "keywords",
-            render: (keywords: string[]) => (
-              <Space wrap size={[4, 4]}>
-                {keywords.map((k) => (
-                  <Tag key={k}>{k}</Tag>
-                ))}
-              </Space>
-            ),
-          },
-          {
-            title: "命中次数",
-            key: "hits",
-            width: 100,
-            render: (_, entry) => playbooks?.hit_stats[entry.id] ?? 0,
-          },
-        ]}
-      />
-    </Spin>
-  );
+  const draftsPanel = <Spin spinning={loading}>{drafts.length ? <List dataSource={drafts} renderItem={(draft) => <List.Item><Card style={{ width: "100%" }} title={draft.title} extra={<Space>
+    <Button type="primary" icon={<CheckOutlined />} loading={actingId === draft.id} onClick={() => reviewDraft(draft, true)}>通过</Button>
+    <Popconfirm title="拒绝并删除该草稿？" onConfirm={() => reviewDraft(draft, false)}><Button danger icon={<CloseOutlined />} loading={actingId === draft.id}>拒绝</Button></Popconfirm>
+  </Space>}><Space wrap>{draft.keywords.map((k) => <Tag key={k}>{k}</Tag>)}<Tag color="purple">提问簇 {draft.cluster_count}</Tag></Space>
+  {draft.warnings && draft.warnings !== "无" && <Alert type="warning" message={draft.warnings} style={{ marginTop: 8 }} />}
+  <pre style={{ whiteSpace: "pre-wrap", maxHeight: 320, overflow: "auto" }}>{draft.instructions}</pre></Card></List.Item>} /> : <Empty description="暂无待审草稿" />}</Spin>;
 
-  const evolvePanel = (
-    <div>
-      <Typography.Paragraph type="secondary">
-        立即分析最近窗口期（默认 7 天）内的高频提问，为达标问题簇生成待审手册草稿。
-        整个过程需要调用大模型，可能耗时数分钟，请勿重复点击。
-      </Typography.Paragraph>
-      <Button
-        type="primary"
-        size="large"
-        icon={<ThunderboltOutlined />}
-        loading={evolving}
-        onClick={handleEvolve}
-      >
-        {evolving ? "进化进行中，请耐心等待…" : "立即触发一次进化"}
-      </Button>
-      {evolveResult && (
-        <Card style={{ marginTop: 16 }} title={`本次发现 ${evolveResult.clusters_found} 个高频问题簇`}>
-          {evolveResult.drafts.length === 0 ? (
-            <Typography.Text type="secondary">
-              没有产生新草稿：可能近期提问均已被现有手册覆盖，或处于冷却期。
-            </Typography.Text>
-          ) : (
-            <List
-              dataSource={evolveResult.drafts}
-              renderItem={(item) => (
-                <List.Item>
-                  {item.id ? (
-                    <Space>
-                      <CheckOutlined style={{ color: "#52c41a" }} />
-                      <span>《{item.title}》草稿已生成</span>
-                      {item.warnings && item.warnings.length > 0 && (
-                        <Tag color="warning">警告：{item.warnings.join("；")}</Tag>
-                      )}
-                    </Space>
-                  ) : (
-                    <Space>
-                      <CloseOutlined style={{ color: "#ff4d4f" }} />
-                      <span>「{item.title}」生成失败：{item.error}</span>
-                    </Space>
-                  )}
-                </List.Item>
-              )}
-            />
-          )}
-          <Button
-            style={{ marginTop: 12 }}
-            icon={<ReloadOutlined />}
-            onClick={() => {
-              setActiveTab("drafts");
-              loadDrafts();
-            }}
-          >
-            前往审核草稿
-          </Button>
-        </Card>
-      )}
+  const playbooksPanel = <Table rowKey="id" loading={loading} dataSource={playbooks?.entries ?? []} pagination={false}
+    expandable={{ expandedRowRender: (row) => <pre style={{ whiteSpace: "pre-wrap" }}>{row.instructions}</pre> }} columns={[
+      { title: "标题", dataIndex: "title" },
+      { title: "来源", dataIndex: "source", render: (v: string) => <Tag color={v === "auto" ? "green" : "blue"}>{v === "auto" ? "自动生成" : "人工维护"}</Tag> },
+      { title: "关键词", dataIndex: "keywords", render: (values: string[]) => <Space wrap>{values.map((v) => <Tag key={v}>{v}</Tag>)}</Space> },
+      { title: "命中", render: (_: unknown, row) => playbooks?.hit_stats[row.id] ?? 0 },
+    ]} />;
+
+  const evolvePanel = <Space direction="vertical" size="middle">
+    <Typography.Paragraph type="secondary">分析近期高频问题并生成待审操作手册草稿，过程可能持续数分钟。</Typography.Paragraph>
+    <Button type="primary" size="large" icon={<ThunderboltOutlined />} loading={evolving} onClick={async () => {
+      setEvolving(true); setEvolveResult(null);
+      try { const result = await adminApi.evolve(); setEvolveResult(result); message.success("进化任务已完成"); await loadPlaybooks(); }
+      catch (error) { message.error(errorMessage(error, "进化失败")); }
+      finally { setEvolving(false); }
+    }}>立即触发一次进化</Button>
+    {evolveResult && <Alert type="success" showIcon message={`发现 ${evolveResult.clusters_found} 个问题簇，生成 ${evolveResult.drafts.filter((d) => d.id).length} 个草稿`} />}
+  </Space>;
+
+  return <div style={{ minHeight: "100vh", background: "#f0f2f5", padding: "24px 16px" }}>
+    <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+      <Card style={{ marginBottom: 16 }}><Space style={{ width: "100%", justifyContent: "space-between" }} wrap>
+        <Typography.Title level={4} style={{ margin: 0 }}>FinMind 管理后台</Typography.Title>
+        <Link to="/"><Button icon={<ArrowLeftOutlined />}>返回助手</Button></Link>
+      </Space></Card>
+      <Card><Tabs activeKey={activeTab} onChange={selectTab} items={[
+        { key: "users", label: "最近登录用户", children: usersPanel },
+        { key: "admins", label: "管理员", children: adminsPanel },
+        { key: "logs", label: "审计日志", children: logsPanel },
+        { key: "drafts", label: `待审草稿（${drafts.length}）`, children: draftsPanel },
+        { key: "playbooks", label: "手册列表", children: playbooksPanel },
+        { key: "evolve", label: "触发进化", children: evolvePanel },
+      ]} /></Card>
     </div>
-  );
-
-  return (
-    <div style={{ minHeight: "100vh", background: "#f0f2f5", padding: "24px 16px" }}>
-      <div style={{ maxWidth: 960, margin: "0 auto" }}>
-        <Card style={{ marginBottom: 16 }}>
-          <Space direction="vertical" style={{ width: "100%" }} size="middle">
-            <Space style={{ width: "100%", justifyContent: "space-between" }} wrap>
-              <Typography.Title level={4} style={{ margin: 0 }}>
-                操作手册管理台
-              </Typography.Title>
-              <Link to="/">
-                <Button icon={<ArrowLeftOutlined />}>返回助手</Button>
-              </Link>
-            </Space>
-            <Input.Password
-              placeholder="管理员令牌（对应服务器 .env 的 ADMIN_TOKEN）"
-              defaultValue={getAdminToken()}
-              onChange={(e) => setAdminToken(e.target.value.trim())}
-              autoComplete="off"
-              style={{ maxWidth: 480 }}
-            />
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              令牌仅保存在当前浏览器标签页会话中；留空时仅当服务端未配置 ADMIN_TOKEN 才能访问。
-            </Typography.Text>
-          </Space>
-        </Card>
-        <Card>
-          <Tabs
-            activeKey={activeTab}
-            onChange={setActiveTab}
-            items={[
-              {
-                key: "drafts",
-                label: `待审草稿（${drafts.length}）`,
-                children: draftsPanel,
-              },
-              { key: "playbooks", label: "手册列表", children: playbooksPanel },
-              { key: "evolve", label: "触发进化", children: evolvePanel },
-            ]}
-          />
-        </Card>
-      </div>
-    </div>
-  );
+    <Drawer width={760} open={drawerOpen} onClose={() => setDrawerOpen(false)} title={conversationDetail ? `对话详情：${conversationDetail.conversation.title}` : `用户 ${conversationList?.user.student_number ?? ""} 的对话`}>
+      <Spin spinning={loading}>
+        {conversationDetail ? <Space direction="vertical" style={{ width: "100%" }}>
+          <Button onClick={() => setConversationDetail(null)}>返回对话列表</Button>
+          {conversationDetail.has_more && <Button onClick={loadEarlierTurns}>加载更早轮次</Button>}
+          {conversationDetail.turns.map((turn) => <Card key={turn.id} size="small" title={`第 ${turn.position} 轮 · ${time(turn.created_at)}`}>
+            <Typography.Text strong>用户</Typography.Text><Typography.Paragraph style={{ whiteSpace: "pre-wrap" }}>{turn.user_message}</Typography.Paragraph>
+            <Typography.Text strong>助手</Typography.Text><Typography.Paragraph style={{ whiteSpace: "pre-wrap" }}>{turn.response.answer}</Typography.Paragraph>
+          </Card>)}
+        </Space> : <List dataSource={conversationList?.items ?? []} locale={{ emptyText: "该用户暂无对话" }} renderItem={(item) => <List.Item actions={[<Button type="link" onClick={() => openConversation(item.id)}>查看详情</Button>]}><List.Item.Meta title={item.title} description={`创建：${time(item.created_at)}　更新：${time(item.updated_at)}`} /></List.Item>} />}
+      </Spin>
+    </Drawer>
+  </div>;
 }

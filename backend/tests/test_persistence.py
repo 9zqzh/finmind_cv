@@ -10,7 +10,8 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy import select
 
 from app.config import Settings
-from app.models import AuthSession, Base, User
+from app.models import AdminGrant, AuthSession, Base, User
+from app.services.admin import resolve_admin_role
 from app.services.conversation import ConversationManager
 from app.services.crypto import CookieCipher
 from app.services.session import JwxtSession, SessionManager
@@ -127,4 +128,33 @@ async def test_login_session_is_hashed_encrypted_and_restorable(tmp_path, monkey
 
     await restored_manager.close()
     await manager.close()
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_admin_roles_require_initial_config_and_support_pre_authorization(tmp_path):
+    engine = create_async_engine(f"sqlite+aiosqlite:///{(tmp_path / 'admin.sqlite3').as_posix()}")
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+
+    async with factory() as db:
+        db.add(AdminGrant(
+            student_number="20260002",
+            granted_by_student_number="20260001",
+        ))
+        await db.commit()
+
+        disabled = await resolve_admin_role(
+            db, Settings(_env_file=None, INITIAL_ADMIN_STUDENT_NUMBER=""), "20260002"
+        )
+        assert disabled.is_admin is False
+
+        settings = Settings(_env_file=None, INITIAL_ADMIN_STUDENT_NUMBER="20260001")
+        initial = await resolve_admin_role(db, settings, "20260001")
+        ordinary = await resolve_admin_role(db, settings, "20260002")
+        assert initial.is_super_admin is True
+        assert ordinary.is_admin is True
+        assert ordinary.is_super_admin is False
+
     await engine.dispose()

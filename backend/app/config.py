@@ -155,8 +155,10 @@ class Settings(BaseSettings):
     )
     evolution_interval_days: int = Field(default=7, alias="EVOLUTION_INTERVAL_DAYS")
     evolution_run_hour: int = Field(default=3, alias="EVOLUTION_RUN_HOUR")
-    # 管理接口令牌；留空表示不校验（仅限原型阶段，生产必须配置）
-    admin_token: str = Field(default="", alias="ADMIN_TOKEN")
+    # 管理后台的配置驱动超级管理员；留空时管理后台整体禁用。
+    initial_admin_student_number: str = Field(
+        default="", alias="INITIAL_ADMIN_STUDENT_NUMBER"
+    )
     # 原始资料文件目录（相对 backend 目录，默认为项目根下的 resources）
     resources_dir: str = Field(default="../resources", alias="RESOURCES_DIR")
 

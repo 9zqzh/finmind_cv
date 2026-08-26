@@ -59,10 +59,10 @@ export class ApiBizError extends Error {
   }
 }
 
-const client = axios.create({ baseURL: "/", timeout: 90000 });
+export const httpClient = axios.create({ baseURL: "/", timeout: 90000 });
 
 // 请求拦截：自动附带会话 token
-client.interceptors.request.use((config) => {
+httpClient.interceptors.request.use((config) => {
   const token = getToken();
   if (token) {
     config.headers.set("X-Session-Token", token);
@@ -71,7 +71,7 @@ client.interceptors.request.use((config) => {
 });
 
 // 响应拦截：统一拆包 {success, data, message, code}
-client.interceptors.response.use(
+httpClient.interceptors.response.use(
   (response) => {
     const body = response.data as ApiEnvelope<unknown>;
     if (body && body.success === false) {
@@ -93,40 +93,40 @@ client.interceptors.response.use(
   },
 );
 
-function unwrap<T>(response: { data: ApiEnvelope<T> }): T {
+export function unwrap<T>(response: { data: ApiEnvelope<T> }): T {
   return response.data.data as T;
 }
 
 export const api = {
   // ---- 认证 ----
   getCaptcha: () =>
-    client.post<ApiEnvelope<CaptchaData>>("/api/auth/captcha").then(unwrap),
+    httpClient.post<ApiEnvelope<CaptchaData>>("/api/auth/captcha").then(unwrap),
   login: (payload: {
     session_token: string;
     username: string;
     password: string;
     captcha: string;
-  }) => client.post<ApiEnvelope<LoginData>>("/api/auth/login", payload).then(unwrap),
-  logout: () => client.post<ApiEnvelope<unknown>>("/api/auth/logout").then(unwrap),
+  }) => httpClient.post<ApiEnvelope<LoginData>>("/api/auth/login", payload).then(unwrap),
+  logout: () => httpClient.post<ApiEnvelope<unknown>>("/api/auth/logout").then(unwrap),
   authStatus: () =>
-    client.get<ApiEnvelope<AuthStatus>>("/api/auth/status").then(unwrap),
+    httpClient.get<ApiEnvelope<AuthStatus>>("/api/auth/status").then(unwrap),
 
   // ---- 对话 ----
   chat: (message: string, conversationId?: string | null) =>
-    client
+    httpClient
       .post<ApiEnvelope<ChatData>>("/api/chat", {
         message,
         conversation_id: conversationId || null,
       })
       .then(unwrap),
   conversations: (page = 1, pageSize = 20) =>
-    client
+    httpClient
       .get<ApiEnvelope<ConversationListData>>("/api/conversations", {
         params: { page, page_size: pageSize },
       })
       .then(unwrap),
   conversation: (id: string, beforePosition?: number, limit = 50) =>
-    client
+    httpClient
       .get<ApiEnvelope<ConversationDetailData>>(`/api/conversations/${id}`, {
         params: {
           limit,
@@ -135,21 +135,21 @@ export const api = {
       })
       .then(unwrap),
   deleteConversation: (id: string) =>
-    client.delete<ApiEnvelope<{ deleted: boolean }>>(`/api/conversations/${id}`).then(unwrap),
+    httpClient.delete<ApiEnvelope<{ deleted: boolean }>>(`/api/conversations/${id}`).then(unwrap),
 
   // ---- 教务查询 ----
   schedule: (term: string, week?: number) =>
-    client
+    httpClient
       .get<ApiEnvelope<Schedule>>("/api/schedule", { params: { term, week } })
       .then(unwrap),
   grades: (term?: string) =>
-    client
+    httpClient
       .get<ApiEnvelope<GradeReport>>("/api/grades", { params: term ? { term } : {} })
       .then(unwrap),
   trainingPlan: () =>
-    client.get<ApiEnvelope<TrainingPlan>>("/api/training-plan").then(unwrap),
+    httpClient.get<ApiEnvelope<TrainingPlan>>("/api/training-plan").then(unwrap),
   classroomBuildings: (campus: string) =>
-    client
+    httpClient
       .get<ApiEnvelope<{ label: string; value: string }[]>>("/api/classroom-buildings", {
         params: { campus },
       })
@@ -159,17 +159,17 @@ export const api = {
     campus?: string;
     building?: string;
   }) =>
-    client
+    httpClient
       .get<ApiEnvelope<ClassroomSchedule>>("/api/classroom-schedule", { params })
       .then(unwrap),
 
   // ---- 知识库/资讯 ----
   knowledgeSearch: (q: string) =>
-    client
+    httpClient
       .get<ApiEnvelope<SearchData>>("/api/knowledge/search", { params: { q } })
       .then(unwrap),
   informationSearch: (q: string) =>
-    client
+    httpClient
       .get<ApiEnvelope<SearchData>>("/api/information/search", { params: { q } })
       .then(unwrap),
 
@@ -177,7 +177,7 @@ export const api = {
 
   /** 资料文件树（按目录分组） */
   resourceFiles: () =>
-    client.get<ApiEnvelope<ResourceTree>>("/api/knowledge/files").then(unwrap),
+    httpClient.get<ApiEnvelope<ResourceTree>>("/api/knowledge/files").then(unwrap),
 
   /** 资料文件下载/预览 URL */
   resourceFileUrl: (path: string) =>
@@ -185,7 +185,7 @@ export const api = {
 
   /** 通用 GET 请求（用于后端代理转发外部 API） */
   getExternal: async <T = unknown>(url: string) => {
-    const res = await client.get<ApiEnvelope<T>>(url);
+    const res = await httpClient.get<ApiEnvelope<T>>(url);
     return res.data.data as T;
   },
 };

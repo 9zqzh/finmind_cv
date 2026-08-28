@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数智金院 FinMind — 移动端 UI 原型</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: #f0f2f5;
+    padding: 40px 20px 60px;
+    min-height: 100vh;
+  }
+
+  .page-title {
+    text-align: center;
+    margin-bottom: 12px;
+  }
+  .page-title h1 {
+    font-size: 28px;
+    font-weight: 700;
+    background: linear-gradient(120deg, #1e3a8a 0%, #3f5be0 35%, #5b6ee8 70%, #2a7fe0 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: 0.04em;
+  }
+  .page-subtitle {
+    text-align: center;
+    font-size: 15px;
+    color: #667085;
+    margin-bottom: 48px;
+    letter-spacing: 0.02em;
+  }
+
+  .screens-grid {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    flex-wrap: wrap;
+    max-width: 1800px;
+    margin: 0 auto;
+  }
+
+  .screen-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .screen-frame {
+    width: 375px;
+    height: 812px;
+    border-radius: 44px;
+    overflow: hidden;
+    box-shadow: 0 12px 48px rgba(0,0,0,0.15), 0 4px 16px rgba(0,0,0,0.08);
+    border: 6px solid #1d1d1f;
+    position: relative;
+    background: #000;
+  }
+  .screen-frame iframe {
+    width: 375px;
+    height: 812px;
+    border: none;
+    display: block;
+  }
+
+  .screen-label {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1d2939;
+    letter-spacing: 0.02em;
+  }
+  .screen-label-sub {
+    font-size: 13px;
+    color: #98a2b3;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+  }
+
+  .footer-note {
+    text-align: center;
+    margin-top: 48px;
+    font-size: 13px;
+    color: #98a2b3;
+    letter-spacing: 0.02em;
+  }
+
+  @media (max-width: 900px) {
+    .screens-grid {
+      gap: 24px;
+    }
+    .screen-frame {
+      width: 300px;
+      height: 650px;
+    }
+    .screen-frame iframe {
+      width: 300px;
+      height: 650px;
+      transform-origin: top left;
+      transform: scale(0.8);
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="page-title">
+  <h1>数智金院 FinMind</h1>
+</div>
+<div class="page-subtitle">移动端 UI 高保真原型 — 4 个核心页面</div>
+
+<div class="screens-grid">
+
+  <div class="screen-wrapper">
+    <div class="screen-frame">
+      <iframe src="home.html" title="首页"></iframe>
+    </div>
+    <div class="screen-label">首页 <span class="screen-label-sub">Home</span></div>
+  </div>
+
+  <div class="screen-wrapper">
+    <div class="screen-frame">
+      <iframe src="ai-chat.html" title="AI 对话"></iframe>
+    </div>
+    <div class="screen-label">AI 对话 <span class="screen-label-sub">Chat</span></div>
+  </div>
+
+  <div class="screen-wrapper">
+    <div class="screen-frame">
+      <iframe src="knowledge.html" title="知识库"></iframe>
+    </div>
+    <div class="screen-label">知识库 <span class="screen-label-sub">Knowledge</span></div>
+  </div>
+
+  <div class="screen-wrapper">
+    <div class="screen-frame">
+      <iframe src="profile.html" title="我的"></iframe>
+    </div>
+    <div class="screen-label">我的 <span class="screen-label-sub">Profile</span></div>
+  </div>
+
+</div>
+
+<div class="footer-note">数智金院 FinMind v1.0.9 &middot; 广东金融学院大数据与人工智能学院</div>
+
+</body>
+</html>

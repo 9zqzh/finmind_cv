@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=375, initial-scale=1.0">
+<title>数智金院 - 我的</title>
+<style>
+  :root {
+    --primary: #1677ff;
+    --primary-dark: #0958D9;
+    --bg: #f0f4fa;
+    --surface: #ffffff;
+    --text: #1d2939;
+    --text-secondary: #667085;
+    --text-tertiary: #98a2b3;
+    --border: #e5e7eb;
+    --shadow-card: 0 2px 12px rgba(22, 119, 255, 0.06);
+    --radius: 12px;
+    --radius-sm: 8px;
+    --danger: #dc2626;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: #e8ecf0;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    padding: 20px 0;
+  }
+
+  .phone {
+    width: 375px;
+    min-height: 812px;
+    background: var(--bg);
+    position: relative;
+    overflow-x: hidden;
+    border-radius: 40px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.12), inset 0 0 0 2px #d1d5db;
+  }
+
+  .dynamic-island {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 126px;
+    height: 36px;
+    background: #000;
+    border-radius: 20px;
+    z-index: 100;
+  }
+
+  /* Status Bar */
+  .status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 28px 0;
+    height: 54px;
+    background: linear-gradient(135deg, #1677ff 0%, #4096ff 100%);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .status-icons { display: flex; align-items: center; gap: 6px; }
+  .status-icons svg { width: 16px; height: 16px; fill: #fff; }
+  .battery-icon { width: 25px !important; height: 12px !important; }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, #1677ff 0%, #4096ff 100%);
+    padding: 4px 20px 0;
+    text-align: center;
+    position: relative;
+  }
+  .header-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+
+  /* Profile Card */
+  .profile-card {
+    background: linear-gradient(135deg, #1677ff 0%, #4096ff 50%, #69b1ff 100%);
+    padding: 20px 20px 28px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .profile-card::before {
+    content: '';
+    position: absolute;
+    top: -30px;
+    right: -30px;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.08);
+  }
+  .profile-card::after {
+    content: '';
+    position: absolute;
+    bottom: -20px;
+    left: -20px;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.05);
+  }
+
+  .avatar-circle {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    position: relative;
+    border: 3px solid rgba(255,255,255,0.4);
+    z-index: 1;
+  }
+  .avatar-circle span {
+    font-size: 30px;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  }
+  .avatar-edit {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    z-index: 2;
+  }
+  .avatar-edit svg { width: 12px; height: 12px; stroke: var(--primary); fill: none; stroke-width: 2; }
+
+  .profile-info { z-index: 1; }
+  .profile-name {
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 4px;
+    letter-spacing: 0.02em;
+  }
+  .profile-id {
+    font-size: 13px;
+    color: rgba(255,255,255,0.85);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+  }
+
+  /* Content */
+  .content {
+    padding: 16px;
+    padding-bottom: 110px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  /* Academic Info Card */
+  .academic-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-card);
+    padding: 18px 16px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 12px 8px;
+  }
+  .academic-item {
+    text-align: center;
+  }
+  .academic-label {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin-bottom: 6px;
+    letter-spacing: 0.02em;
+    font-weight: 500;
+  }
+  .academic-value {
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 600;
+    line-height: 1.3;
+    word-break: break-all;
+  }
+
+  /* Settings Card */
+  .settings-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+  }
+
+  .setting-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 15px 16px;
+    border-bottom: 1px solid #f5f7fa;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .setting-item:last-child { border-bottom: none; }
+
+  .setting-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .setting-icon svg { width: 18px; height: 18px; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+  .setting-icon.theme { background: #f0f5ff; }
+  .setting-icon.theme svg { stroke: #2f54eb; }
+  .setting-icon.bell { background: #fff7e6; }
+  .setting-icon.bell svg { stroke: #d46b08; }
+  .setting-icon.feedback { background: #f0f9eb; }
+  .setting-icon.feedback svg { stroke: #389e0d; }
+  .setting-icon.service { background: #e6f4ff; }
+  .setting-icon.service svg { stroke: #1677ff; }
+  .setting-icon.about { background: #f9f0ff; }
+  .setting-icon.about svg { stroke: #722ed1; }
+
+  .setting-text {
+    flex: 1;
+    font-size: 15px;
+    color: var(--text);
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+  .setting-value {
+    font-size: 13px;
+    color: var(--text-tertiary);
+    margin-right: 4px;
+    letter-spacing: 0.01em;
+  }
+  .setting-arrow {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+  .setting-arrow svg { width: 16px; height: 16px; stroke: #c0c8d4; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Theme Toggle Preview */
+  .theme-preview {
+    display: flex;
+    gap: 6px;
+    margin-right: 4px;
+  }
+  .theme-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+  }
+  .theme-dot.light { background: #f5f9ff; border-color: var(--primary); }
+  .theme-dot.dark { background: #1d2939; border-color: #475467; }
+
+  /* Logout */
+  .logout-section {
+    text-align: center;
+    padding: 8px 0;
+  }
+  .logout-btn {
+    display: inline-block;
+    padding: 12px 32px;
+    color: var(--danger);
+    font-size: 15px;
+    font-weight: 500;
+    background: var(--surface);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-card);
+    cursor: pointer;
+    border: none;
+    font-family: inherit;
+    letter-spacing: 0.02em;
+  }
+
+  /* Bottom Tab Bar */
+  .tab-bar {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 375px;
+    height: 88px;
+    background: var(--surface);
+    border-top: 1px solid #eef2f7;
+    display: flex;
+    padding-top: 8px;
+    padding-bottom: 28px;
+    z-index: 50;
+  }
+  .tab-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    text-decoration: none;
+    position: relative;
+  }
+  .tab-item svg {
+    width: 24px;
+    height: 24px;
+    stroke-width: 1.8;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke: #98a2b3;
+  }
+  .tab-label {
+    font-size: 10px;
+    color: #98a2b3;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+  }
+  .tab-item.active svg { stroke: var(--primary); }
+  .tab-item.active .tab-label { color: var(--primary); font-weight: 600; }
+  .tab-item.active::before {
+    content: '';
+    position: absolute;
+    top: -9px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 20px;
+    height: 3px;
+    background: var(--primary);
+    border-radius: 2px;
+  }
+
+  .home-indicator {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 134px;
+    height: 5px;
+    background: #000;
+    border-radius: 3px;
+    opacity: 0.2;
+    z-index: 200;
+  }
+</style>
+</head>
+<body>
+<div class="phone" data-component="Profile Page">
+
+  <div class="dynamic-island"></div>
+
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <span class="time">9:41</span>
+    <div class="status-icons">
+      <svg viewBox="0 0 18 12"><path d="M1 4.5C3.5 1.5 7 0 9 0s5.5 1.5 8 4.5" fill="none" stroke="#fff" stroke-width="1.5"/><path d="M3 7C5 5 7 4 9 4s4 1 6 3" fill="none" stroke="#fff" stroke-width="1.5"/><circle cx="9" cy="10" r="1.5" fill="#fff"/></svg>
+      <svg viewBox="0 0 16 12"><rect x="0" y="2" width="3" height="8" rx="0.5" fill="#fff" opacity="0.4"/><rect x="4" y="1" width="3" height="9" rx="0.5" fill="#fff" opacity="0.6"/><rect x="8" y="0" width="3" height="10" rx="0.5" fill="#fff" opacity="0.8"/><rect x="12" y="0" width="3" height="10" rx="0.5" fill="#fff"/></svg>
+      <svg class="battery-icon" viewBox="0 0 28 13"><rect x="0.5" y="0.5" width="23" height="12" rx="3" fill="none" stroke="#fff" stroke-width="1"/><rect x="25" y="4" width="2.5" height="5" rx="1" fill="#fff" opacity="0.5"/><rect x="2" y="2" width="17" height="8" rx="1.5" fill="#fff"/></svg>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <div class="header" data-component="Page Header">
+    <span class="header-title">我的</span>
+  </div>
+
+  <!-- Profile Card -->
+  <div class="profile-card" data-component="User Profile Card">
+    <div class="avatar-circle">
+      <span>陈</span>
+      <div class="avatar-edit">
+        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      </div>
+    </div>
+    <div class="profile-info">
+      <div class="profile-name">陈思远</div>
+      <div class="profile-id">学号：241852041</div>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="content">
+
+    <!-- Academic Info -->
+    <div class="academic-card" data-component="Academic Info">
+      <div class="academic-item">
+        <div class="academic-label">院系</div>
+        <div class="academic-value">金融科技学院</div>
+      </div>
+      <div class="academic-item">
+        <div class="academic-label">专业</div>
+        <div class="academic-value">数据科学与大数据技术</div>
+      </div>
+      <div class="academic-item">
+        <div class="academic-label">年级</div>
+        <div class="academic-value">2024</div>
+      </div>
+      <div class="academic-item">
+        <div class="academic-label">班级</div>
+        <div class="academic-value">24清远数科-2班</div>
+      </div>
+    </div>
+
+    <!-- Settings List -->
+    <div class="settings-card" data-component="Settings List">
+
+      <div class="setting-item">
+        <div class="setting-icon theme">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        </div>
+        <span class="setting-text">页面主题</span>
+        <div class="theme-preview">
+          <div class="theme-dot light"></div>
+          <div class="theme-dot dark"></div>
+        </div>
+        <div class="setting-arrow">
+          <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-icon bell">
+          <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+        </div>
+        <span class="setting-text">提醒功能设置</span>
+        <div class="setting-arrow">
+          <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-icon feedback">
+          <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        </div>
+        <span class="setting-text">反馈意见</span>
+        <div class="setting-arrow">
+          <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-icon service">
+          <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
+        </div>
+        <span class="setting-text">联系客服</span>
+        <div class="setting-arrow">
+          <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-icon about">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        </div>
+        <span class="setting-text">关于我们</span>
+        <span class="setting-value">v1.0.9</span>
+        <div class="setting-arrow">
+          <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Logout -->
+    <div class="logout-section">
+      <button class="logout-btn">退出登录</button>
+    </div>
+
+  </div>
+
+  <!-- Bottom Tab Bar -->
+  <nav class="tab-bar" data-component="Bottom Navigation">
+    <a class="tab-item" href="#">
+      <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span class="tab-label">首页</span>
+    </a>
+    <a class="tab-item" href="#">
+      <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/><path d="M8 10h.01"/><path d="M12 10h.01"/><path d="M16 10h.01"/></svg>
+      <span class="tab-label">AI 对话</span>
+    </a>
+    <a class="tab-item" href="#">
+      <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+      <span class="tab-label">知识库</span>
+    </a>
+    <a class="tab-item active" href="#">
+      <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span class="tab-label">我的</span>
+    </a>
+  </nav>
+
+  <div class="home-indicator"></div>
+
+</div>
+</body>
+</html>

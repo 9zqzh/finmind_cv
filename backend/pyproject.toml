@@ -36,6 +36,9 @@ tools = [
     "python-docx>=1.1,<2",
     "pywin32>=306; sys_platform == 'win32'",
 ]
+demo = [
+    "ddddocr>=1.4",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]

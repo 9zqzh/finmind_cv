@@ -414,6 +414,7 @@ async def list_audit_logs(
 
 @router.get("/demo-session")
 async def get_demo_session(
+    request: Request,
     admin: AdminContext = Depends(get_required_admin),
     db: AsyncSession = Depends(get_db),
 ):
@@ -421,13 +422,22 @@ async def get_demo_session(
     del admin
     record = await db.scalar(select(DemoSession).limit(1))
     if record is None:
-        return ok({"configured": False})
+        return ok({"configured": False, "guardian": _guardian_status(request)})
     return ok({
         "configured": True,
         "username": record.username,
         "created_at": record.created_at,
         "updated_at": record.updated_at,
+        "guardian": _guardian_status(request),
     })
+
+
+def _guardian_status(request: Request) -> dict:
+    """共享会话守护任务运行状态（未启用时返回空对象）。"""
+    guardian = getattr(request.app.state, "guardian", None)
+    if guardian is None:
+        return {}
+    return dict(guardian.status)
 
 
 @router.post("/demo-session")

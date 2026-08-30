@@ -308,11 +308,23 @@ export interface AdminConversationDetail {
   has_more: boolean;
 }
 
+export interface DemoSessionGuardianInfo {
+  enabled?: boolean;
+  configured?: boolean;
+  ocr_available?: boolean;
+  last_check_at?: string | null;
+  last_check_ok?: boolean | null;
+  last_recover_at?: string | null;
+  recover_count?: number;
+  last_error?: string | null;
+}
+
 export interface DemoSessionInfo {
   configured: boolean;
   username?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  guardian?: DemoSessionGuardianInfo;
 }
 
 export interface AuditLogItem {

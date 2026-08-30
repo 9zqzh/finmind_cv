@@ -313,6 +313,23 @@ export default function AdminPage() {
         { key: "user", label: "共享账号", children: <Tag color="blue">{demoInfo.username}</Tag> },
         { key: "updated", label: "最近更新", children: time(demoInfo.updated_at) },
       ]} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="尚未配置共享会话（未配置时访客仍会看到登录页）" />) : <Spin />}
+      {demoInfo?.guardian && (demoInfo.guardian.enabled || demoInfo.guardian.last_check_at) && (
+        <Alert style={{ marginTop: 12 }} type={demoInfo.guardian.last_check_ok === false ? "warning" : "success"} showIcon
+          message="自动守护"
+          description={(() => {
+            const g = demoInfo.guardian!;
+            const parts: string[] = [];
+            if (g.enabled) parts.push("已开启");
+            else parts.push("未开启（DEMO_MODE=false）");
+            parts.push(g.configured ? "已配置共享账号凭据" : "未配置共享账号凭据（失效后无法自动恢复）");
+            parts.push(g.ocr_available ? "OCR 就绪" : "OCR 未安装（无法自动识别验证码）");
+            if (g.last_check_at) parts.push(`上次检查：${time(g.last_check_at)}`);
+            if (g.recover_count) parts.push(`已自动恢复 ${g.recover_count} 次`);
+            if (g.last_recover_at) parts.push(`最近恢复：${time(g.last_recover_at)}`);
+            if (g.last_error) parts.push(`⚠ ${g.last_error}`);
+            return parts.join(" · ");
+          })()} />
+      )}
     </Card>
     {isSuperAdmin && <Card size="small" title="配置共享会话">
       <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>

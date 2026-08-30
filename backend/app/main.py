@@ -24,6 +24,7 @@ from app.knowledge.factory import build_knowledge_service
 from app.schemas.common import INVALID_PARAM, ApiError, fail, ok
 from app.services.conversation import ConversationManager
 from app.services.crypto import CookieCipher
+from app.services.demo_guardian import start_guardian, stop_guardian
 from app.services.session import SessionManager
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -54,9 +55,12 @@ async def lifespan(app: FastAPI):
     )
     # 定时自进化后台任务（产出草稿，仍需管理员审核）
     app.state.evolution_task = start_scheduler(sessions)
+    # 共享会话守护：评委演示模式下周期性验证并自动恢复共享教务会话
+    app.state.guardian = start_guardian(settings, app.state.sessions, sessions)
     try:
         yield
     finally:
+        await stop_guardian(app.state.guardian)
         await stop_scheduler(app.state.evolution_task)
         await app.state.sessions.close()
         await engine.dispose()

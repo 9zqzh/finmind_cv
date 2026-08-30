@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ChatData } from "../api/types";
+import type { ChatData } from "../../../api/types";
 import {
   applyStreamSnapshot,
   completeAssistantMessage,

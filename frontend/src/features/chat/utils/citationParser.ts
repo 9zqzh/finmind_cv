@@ -1,4 +1,4 @@
-import type { CitationInfo } from "../api/types";
+import type { CitationInfo } from "../../../api/types";
 
 export type CitationSegment =
   | { kind: "markdown"; text: string }

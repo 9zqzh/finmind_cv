@@ -1,0 +1,37 @@
+:root {
+  /* 字号 */
+  --font-2xl: 24px;
+  --font-xl: 18px;
+  --font-lg: 16px;
+  --font-md: 14px;
+  --font-sm: 12px;
+  --font-xs: 11px;
+  /* 间距 */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  /* 圆角 */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+}
+
+@media (max-width: 767px) {
+  :root {
+    --font-2xl: 18px;
+    --font-xl: 15px;
+    --font-lg: 13px;
+    --font-md: 11px;
+    --font-sm: 10px;
+    --font-xs: 9px;
+    --space-xs: 2px;
+    --space-sm: 4px;
+    --space-md: 8px;
+    --space-lg: 10px;
+    --space-xl: 12px;
+    --radius-sm: 4px;
+    --radius-md: 6px;
+  }
+}
+

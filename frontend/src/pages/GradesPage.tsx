@@ -3,7 +3,6 @@ import {
   Button,
   Card,
   Descriptions,
-  Grid,
   message,
   Select,
   Space,
@@ -11,6 +10,7 @@ import {
   Tag,
 } from "antd";
 import { api, ApiBizError } from "../api/client";
+import { useIsMobile } from "../hooks/useIsMobile";
 import type { GradeReport } from "../api/types";
 import { useAuth } from "../context/AuthContext";
 import { getTermOptions } from "../utils/terms";
@@ -43,8 +43,7 @@ function MobileGradeTable({ report }: { report: GradeReport }) {
 
 export function GradesContent() {
   const { username } = useAuth();
-  const screens = Grid.useBreakpoint();
-  const isMobile = !screens.md;
+  const isMobile = useIsMobile();
   const termOptions = useMemo(() => getTermOptions(username), [username]);
   const [term, setTerm] = useState("");
   const [loading, setLoading] = useState(false);

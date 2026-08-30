@@ -1,4 +1,4 @@
-import type { ChatData } from "../api/types";
+import type { ChatData } from "../../../api/types";
 
 export interface ToolCallStep {
   tool_name: string;

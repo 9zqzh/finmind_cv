@@ -10,6 +10,7 @@ import {
   getInformationStore,
   subscribeToInformationStore,
   preloadInformationData,
+  type ArticleItem,
 } from "../stores/informationStore";
 import { useSyncExternalStore } from "react";
 
@@ -96,7 +97,8 @@ export default function InformationPage() {
     }
   }, [store.loaded, store.loading]);
 
-  const sections = [
+  type SectionKey = "xyxw" | "xshuhd" | "xshenghd" | "tzgg";
+  const sections: { key: SectionKey; label: string; icon: React.ReactNode }[] = [
     { key: "xyxw", label: "xyxw", icon: SECTION_ICONS.xyxw },
     { key: "xshuhd", label: "xshuhd", icon: SECTION_ICONS.xshuhd },
     { key: "xshenghd", label: "xshenghd", icon: SECTION_ICONS.xshenghd },
@@ -118,7 +120,7 @@ export default function InformationPage() {
       <Tabs
         defaultActiveKey="xyxw"
         items={sections.map((sec) => {
-          const items = (store as any)[sec.key] ?? [];
+          const items: ArticleItem[] = store[sec.key] ?? [];
           return {
             key: sec.key,
             label: (

@@ -13,4 +13,17 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // 手动拆包：框架、UI 库、Markdown 渲染器各自成 chunk，
+        // 业务代码按路由懒加载，避免单个 chunk 过大。
+        manualChunks: {
+          react: ["react", "react-dom", "react-router-dom"],
+          antd: ["antd", "@ant-design/icons"],
+          markdown: ["react-markdown", "remark-gfm"],
+        },
+      },
+    },
+  },
 });

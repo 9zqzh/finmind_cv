@@ -48,10 +48,10 @@ export async function preloadInformationData() {
       tzgg: ArticleItem[];
     }>("/api/information/home");
 
-    store.xyxw = (data as any).xyxw ?? [];
-    store.xshuhd = (data as any).xshuhd ?? [];
-    store.xshenghd = (data as any).xshenghd ?? [];
-    store.tzgg = (data as any).tzgg ?? [];
+    store.xyxw = data.xyxw ?? [];
+    store.xshuhd = data.xshuhd ?? [];
+    store.xshenghd = data.xshenghd ?? [];
+    store.tzgg = data.tzgg ?? [];
     store.loaded = true;
     store.error = false;
   } catch {

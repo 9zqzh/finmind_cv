@@ -137,9 +137,9 @@ export async function preloadCompetitionData() {
       ),
     ]);
 
-    store.items = (compRes as any).competitions?.map(mapCompetition) ?? [];
-    store.notices = (noticeRes as any).notices?.map(mapNotice) ?? [];
-    store.clubs = (clubRes as any).data?.map(mapClub) ?? [];
+    store.items = compRes.competitions?.map(mapCompetition) ?? [];
+    store.notices = noticeRes.notices?.map(mapNotice) ?? [];
+    store.clubs = clubRes.data?.map(mapClub) ?? [];
     store.loaded = true;
     store.error = false;
   } catch {

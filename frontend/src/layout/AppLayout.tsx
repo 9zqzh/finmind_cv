@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation, useNavigate, Outlet } from "react-router-dom";
-import { Button, Drawer, Grid, Layout, Menu, Space, Tag, Typography } from "antd";
+import { Button, Drawer, Layout, Menu, Space, Tag, Typography } from "antd";
 import {
   BookOutlined,
   DatabaseOutlined,
@@ -11,6 +11,7 @@ import {
   TrophyOutlined,
 } from "@ant-design/icons";
 import { useAuth } from "../context/AuthContext";
+import { useIsMobile } from "../hooks/useIsMobile";
 import logo from "../assets/logo.jpg";
 import packageJson from "../../package.json";
 
@@ -29,8 +30,7 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { username, logout } = useAuth();
-  const screens = Grid.useBreakpoint();
-  const isMobile = !screens.md;
+  const isMobile = useIsMobile();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const handleLogout = async () => {

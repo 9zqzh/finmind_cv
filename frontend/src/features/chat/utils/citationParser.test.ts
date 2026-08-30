@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CitationInfo } from "../api/types";
+import type { CitationInfo } from "../../../api/types";
 import {
   hasResolvedCitation,
   parseCitationSegments,

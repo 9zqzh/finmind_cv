@@ -1,0 +1,111 @@
+.query-toolbar {
+  margin-bottom: 16px;
+}
+
+.query-toolbar .ant-space-item {
+  min-width: 0;
+}
+
+.query-toolbar__control {
+  min-width: 160px;
+}
+
+.mobile-card-list {
+  display: none;
+}
+
+.mobile-record-card {
+  border: 1px solid #d9e8f7;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.mobile-record-card .ant-card-body {
+  padding: 12px;
+}
+
+.mobile-record-card__meta {
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.schedule-grid-scroll {
+  border: 1px solid #d9e8f7;
+  border-radius: 6px;
+  background: #ffffff;
+  overflow-x: auto;
+}
+
+.schedule-grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(min-content, 1fr));
+  width: 100%;
+  min-width: 880px;
+}
+
+.schedule-grid__row {
+  display: contents;
+}
+
+.schedule-grid__cell {
+  min-width: 0;
+  padding: 6px;
+  border-right: 1px solid #d9e8f7;
+  border-bottom: 1px solid #d9e8f7;
+}
+
+.schedule-grid__cell:nth-child(8n) {
+  border-right: 0;
+}
+
+.schedule-grid__cell--corner,
+.schedule-grid__cell--header,
+.schedule-grid__cell--period {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #164b80;
+  font-weight: 600;
+  font-size: 14px;
+  background: #eef7ff;
+}
+
+.schedule-grid__cell--course {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #ffffff;
+}
+
+.schedule-grid__course {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px;
+  border-left: 0;
+  background: #f5f9ff;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.schedule-grid__course:hover,
+.schedule-grid__course--selected {
+  background: #e6f4ff;
+  box-shadow: 0 0 0 1px #91caff inset;
+}
+
+.schedule-grid__course .ant-typography {
+  margin: 0;
+  line-height: 1.35;
+  font-size: 11px;
+  word-break: break-word;
+}
+
+.schedule-grid__empty {
+  align-self: center;
+  margin: auto;
+  color: #98a2b3;
+}
+

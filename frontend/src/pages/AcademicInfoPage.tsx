@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, Tabs } from "antd";
 import {
   BookOutlined,
@@ -33,19 +33,16 @@ export default function AcademicInfoPage() {
     }
   }, [location.hash]);
 
-  const items = useMemo(
-    () =>
-      sections.map((section) => ({
-        key: section.key,
-        label: (
-          <span>
-            {section.icon} {section.label}
-          </span>
-        ),
-        children: section.content,
-      })),
-    [],
-  );
+  // 仅渲染当前激活 tab 的内容，配合 destroyInactiveTabPane 避免四个内容组件同时挂载。
+  const items = sections.map((section) => ({
+    key: section.key,
+    label: (
+      <span>
+        {section.icon} {section.label}
+      </span>
+    ),
+    children: activeKey === section.key ? section.content : null,
+  }));
 
   return (
     <Card title="教务信息">
@@ -53,6 +50,7 @@ export default function AcademicInfoPage() {
         activeKey={activeKey}
         onChange={setActiveKey}
         items={items}
+        destroyInactiveTabPane
       />
     </Card>
   );

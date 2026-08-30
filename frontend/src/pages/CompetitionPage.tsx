@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { Card, Col, Grid, Modal, Row, Tag, Typography, Spin, Space, Empty, Tabs } from "antd";
+import { Card, Col, Modal, Row, Tag, Typography, Spin, Space, Empty, Tabs } from "antd";
 import {
   ClockCircleOutlined,
   TeamOutlined,
@@ -16,6 +16,7 @@ import {
   preloadCompetitionData,
 } from "../stores/competitionStore";
 import type { CompetitionItem, NoticeItem, ClubItem } from "../stores/competitionStore";
+import { useIsMobile } from "../hooks/useIsMobile";
 
 // 类型从 competitionStore 导入
 
@@ -83,8 +84,7 @@ const formatDateTime = (iso: string | null) => {
 // ---- 组件 ----
 function CompetitionCard({ item }: { item: CompetitionItem }) {
   const [open, setOpen] = useState(false);
-  const screens = Grid.useBreakpoint();
-  const isMobile = !screens.md;
+  const isMobile = useIsMobile();
 
   return (
     <>

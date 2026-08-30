@@ -41,7 +41,10 @@ function ProtectedAdmin() {
 }
 
 export default function App() {
-  useEffect(() => { preloadCompetitionData(); preloadInformationData(); }, []);
+  useEffect(() => {
+    preloadCompetitionData();
+    preloadInformationData();
+  }, []);
 
   return (
     <AuthProvider>

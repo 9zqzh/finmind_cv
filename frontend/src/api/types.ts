@@ -187,6 +187,48 @@ export interface ResourceTree {
   files: ResourceFile[];
 }
 
+// ---- 对话结构化结果数据（chat.data 按 result_type 区分） ----
+
+export interface MapPlace {
+  name: string;
+  location: string;
+  address?: string | null;
+  tel?: string | null;
+  distance?: number | null;
+  image_url?: string | null;
+  rating?: number | string | null;
+  cost?: number | string | null;
+  comment_num?: number | string | null;
+}
+
+export interface MapRoute {
+  mode?: string;
+  distance_text?: string | null;
+  duration_text?: string | null;
+  steps?: string[];
+  navigation_url?: string | null;
+}
+
+export interface ScheduleResult {
+  items: ScheduleEntry[];
+}
+
+export interface ClassroomScheduleResult {
+  items: ClassroomEntry[];
+}
+
+export interface TrainingPlanResult {
+  items: TrainingPlanCourse[];
+}
+
+export interface SearchResultPayload {
+  results: SearchChunk[];
+}
+
+export interface MapPlacesResult {
+  places: MapPlace[];
+}
+
 // ---- 操作手册管理（自进化审核） ----
 
 export interface AdminPlaybookEntry {

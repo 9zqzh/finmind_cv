@@ -159,6 +159,9 @@ class Settings(BaseSettings):
     initial_admin_student_number: str = Field(
         default="", alias="INITIAL_ADMIN_STUDENT_NUMBER"
     )
+    # 评委演示模式：开启后，未携带会话令牌的请求自动复用数据库中的共享教务会话
+    # （由管理员在管理台预登录共享账号后写入），评委无需登录即可体验真实个人数据。
+    demo_mode: bool = Field(default=False, alias="DEMO_MODE")
     # 原始资料文件目录（相对 backend 目录，默认为项目根下的 resources）
     resources_dir: str = Field(default="../resources", alias="RESOURCES_DIR")
 

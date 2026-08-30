@@ -15,9 +15,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import AdminContext, get_required_admin, get_required_super_admin
+from app.api.deps import get_session_manager
 from app.config import get_settings
 from app.db import get_db
-from app.models import AdminGrant, AuditLog, AuthSession, Conversation, ConversationTurn, User
+from app.models import AdminGrant, AuditLog, AuthSession, Conversation, ConversationTurn, DemoSession, User
 from app.schemas.common import CONFLICT, INVALID_PARAM, NOT_FOUND, ApiError, ok
 from app.services.admin import add_audit_event, write_audit_safely
 from app.services.session import local_today
@@ -27,6 +28,11 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 class AdminGrantRequest(BaseModel):
     student_number: str = Field(min_length=4, max_length=64, pattern=r"^[0-9]+$")
+
+
+class DemoSessionRequest(BaseModel):
+    token: str = Field(min_length=8, max_length=256)
+
 
 
 @router.get("/admins")
@@ -404,3 +410,58 @@ async def list_audit_logs(
         } for item in items],
         "page": page, "page_size": page_size, "total": int(total or 0),
     })
+
+
+@router.get("/demo-session")
+async def get_demo_session(
+    admin: AdminContext = Depends(get_required_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """查看当前共享会话（评委演示模式用），不暴露令牌本身。"""
+    del admin
+    record = await db.scalar(select(DemoSession).limit(1))
+    if record is None:
+        return ok({"configured": False})
+    return ok({
+        "configured": True,
+        "username": record.username,
+        "created_at": record.created_at,
+        "updated_at": record.updated_at,
+    })
+
+
+@router.post("/demo-session")
+async def set_demo_session(
+    payload: DemoSessionRequest,
+    request: Request,
+    admin: AdminContext = Depends(get_required_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """把指定已登录会话设为共享会话；令牌无效时返回 400。"""
+    manager = get_session_manager(request)
+    session = await manager.set_demo_session(payload.token.strip(), db)
+    if session is None:
+        raise ApiError(INVALID_PARAM, "令牌无效或会话未持久化登录，无法设为共享会话", status_code=400)
+    await write_audit_safely(
+        db, request, event_type="admin.demo_session.set", success=True,
+        actor_user_id=admin.session.user_id, actor_student_number=admin.session.username,
+        target_student_number=session.username, target_type="demo_session",
+    )
+    return ok({"username": session.username})
+
+
+@router.delete("/demo-session")
+async def clear_demo_session(
+    request: Request,
+    admin: AdminContext = Depends(get_required_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """清除共享会话；清除后演示模式退回未登录状态。"""
+    manager = get_session_manager(request)
+    removed = await manager.clear_demo_session(db)
+    await write_audit_safely(
+        db, request, event_type="admin.demo_session.clear", success=True,
+        actor_user_id=admin.session.user_id, actor_student_number=admin.session.username,
+        target_type="demo_session",
+    )
+    return ok({"cleared": removed})

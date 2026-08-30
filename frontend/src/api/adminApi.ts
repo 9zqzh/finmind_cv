@@ -9,6 +9,7 @@ import type {
   AdminUserList,
   ApiEnvelope,
   AuditLogItem,
+  DemoSessionInfo,
   PagedData,
 } from "./types";
 
@@ -62,4 +63,12 @@ export const adminApi = {
     ).then(unwrap),
   auditLogs: (params: Record<string, unknown>) =>
     httpClient.get<ApiEnvelope<PagedData<AuditLogItem>>>("/api/admin/audit-logs", { params }).then(unwrap),
+  demoSession: () =>
+    httpClient.get<ApiEnvelope<DemoSessionInfo>>("/api/admin/demo-session").then(unwrap),
+  setDemoSession: (token: string) =>
+    httpClient.post<ApiEnvelope<{ username: string }>>("/api/admin/demo-session", {
+      token,
+    }).then(unwrap),
+  clearDemoSession: () =>
+    httpClient.delete<ApiEnvelope<{ cleared: boolean }>>("/api/admin/demo-session").then(unwrap),
 };

@@ -26,6 +26,8 @@ export interface AuthStatus {
   username: string | null;
   is_admin: boolean;
   is_super_admin: boolean;
+  /** 评委演示模式：当前会话由后端共享会话提供，无需（也不应）手动退出登录 */
+  demo_mode?: boolean;
 }
 
 export interface ToolCallInfo {
@@ -304,6 +306,13 @@ export interface AdminConversationDetail {
   conversation: ConversationSummary;
   turns: StoredTurn[];
   has_more: boolean;
+}
+
+export interface DemoSessionInfo {
+  configured: boolean;
+  username?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 }
 
 export interface AuditLogItem {

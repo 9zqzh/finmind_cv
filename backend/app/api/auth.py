@@ -90,8 +90,8 @@ async def logout(
     session: JwxtSession | None = Depends(get_optional_session),
     db: AsyncSession = Depends(get_db),
 ):
-    """退出登录并销毁会话。"""
-    if session is not None:
+    """退出登录并销毁会话（演示模式下共享会话不会被登出）。"""
+    if session is not None and not session.via_demo:
         user_id, username = session.user_id, session.username
         try:
             if session.is_logged_in:
@@ -120,16 +120,24 @@ async def logout(
 
 @router.get("/status")
 async def status(
+    request: Request,
     session: JwxtSession | None = Depends(get_optional_session),
     db: AsyncSession = Depends(get_db),
 ):
-    """查询当前登录状态。"""
+    """查询当前登录状态；演示模式下无令牌请求自动落到共享会话。"""
     if session is None:
-        return ok({"logged_in": False, "username": None, "is_admin": False, "is_super_admin": False})
+        return ok({
+            "logged_in": False,
+            "username": None,
+            "is_admin": False,
+            "is_super_admin": False,
+            "demo_mode": get_settings().demo_mode,
+        })
     role = await resolve_admin_role(db, get_settings(), session.username)
     return ok({
         "logged_in": session.is_logged_in,
         "username": session.username,
         "is_admin": role.is_admin,
         "is_super_admin": role.is_super_admin,
+        "demo_mode": get_settings().demo_mode and session.via_demo,
     })

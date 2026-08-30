@@ -90,6 +90,25 @@ class AuthSession(Base):
     user: Mapped[User] = relationship(back_populates="sessions")
 
 
+class DemoSession(Base):
+    """Single shared session used by judge demo mode (DEMO_MODE=true).
+
+    Stores the encrypted session token of a pre-logged-in teaching-affairs
+    account; every visitor without a token is served by this session so that
+    judges can experience real personal data without logging in.
+    """
+
+    __tablename__ = "demo_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    encrypted_token: Mapped[str] = mapped_column(Text)
+    username: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class Conversation(Base):
     __tablename__ = "conversations"
 

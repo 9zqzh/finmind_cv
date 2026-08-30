@@ -17,7 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
-from app.models import AuthSession, User
+from app.models import AuthSession, DemoSession, User
 from app.schemas.common import UPSTREAM_ERROR, ApiError
 from app.services.crypto import CookieCipher
 
@@ -50,6 +50,7 @@ class JwxtSession:
     username: str | None = None
     user_id: uuid.UUID | None = None
     persistent: bool = False
+    via_demo: bool = False
     last_grade_report: GradeReport | None = None
 
     @property
@@ -224,6 +225,50 @@ class SessionManager:
             record.revoked_at = _utcnow()
             record.encrypted_cookies = ""
             await db.commit()
+
+    async def get_demo_session(self, db: AsyncSession) -> JwxtSession | None:
+        """Resolve the shared judge-demo session, or None when not configured.
+
+        The stored token is encrypted with the same cipher as cookies; the
+        resolved session is marked ``via_demo`` so callers can tell requests
+        that fall back to the shared session from real user sessions.
+        """
+        record = await db.scalar(select(DemoSession).limit(1))
+        if record is None:
+            return None
+        try:
+            token = self._cipher.decrypt(record.encrypted_token)["demo_token"]
+        except (ValueError, KeyError):
+            return None
+        session = await self.get(token, db)
+        if session is not None and session.is_logged_in:
+            session.via_demo = True
+            return session
+        return None
+
+    async def set_demo_session(self, token: str, db: AsyncSession) -> JwxtSession | None:
+        """Persist an authenticated persistent session as the shared demo session."""
+        session = await self.get(token, db)
+        if session is None or not session.is_logged_in or not session.persistent:
+            return None
+        record = await db.scalar(select(DemoSession).limit(1))
+        if record is None:
+            record = DemoSession()
+            db.add(record)
+        record.encrypted_token = self._cipher.encrypt({"demo_token": token})
+        record.username = session.username or ""
+        await db.commit()
+        session.via_demo = True
+        return session
+
+    async def clear_demo_session(self, db: AsyncSession) -> bool:
+        """Remove the shared demo session; returns True when one existed."""
+        record = await db.scalar(select(DemoSession).limit(1))
+        if record is None:
+            return False
+        await db.delete(record)
+        await db.commit()
+        return True
 
     def purge_expired_captcha_sessions(self) -> None:
         with self._lock:

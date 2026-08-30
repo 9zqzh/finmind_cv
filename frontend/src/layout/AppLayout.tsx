@@ -29,7 +29,7 @@ const menuItems = [
 export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { username, logout } = useAuth();
+  const { username, logout, isDemo } = useAuth();
   const isMobile = useIsMobile();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -54,12 +54,12 @@ export default function AppLayout() {
     />
   );
 
-  const versionLabel = (
+    const versionLabel = (
     <Typography.Text
       type="secondary"
       style={{ display: "block", fontSize: 12, textAlign: "center" }}
     >
-      当前版本 {appVersion}
+      {isDemo ? "评委体验模式" : `当前版本 ${appVersion}`}
     </Typography.Text>
   );
 
@@ -137,14 +137,16 @@ export default function AppLayout() {
         ) : (
           <Space>
             <Tag color="blue">{username ?? "未登录"}</Tag>
-            <Button
-              type="text"
-              style={{ color: "#1d2939" }}
-              icon={<LogoutOutlined />}
-              onClick={handleLogout}
-            >
-              退出登录
-            </Button>
+            {!isDemo && (
+              <Button
+                type="text"
+                style={{ color: "#1d2939" }}
+                icon={<LogoutOutlined />}
+                onClick={handleLogout}
+              >
+                退出登录
+              </Button>
+            )}
           </Space>
         )}
       </Header>
@@ -183,9 +185,11 @@ export default function AppLayout() {
             <Tag color="blue" style={{ width: "fit-content" }}>
               {username ?? "未登录"}
             </Tag>
-            <Button block icon={<LogoutOutlined />} onClick={handleLogout}>
-              退出登录
-            </Button>
+            {!isDemo && (
+              <Button block icon={<LogoutOutlined />} onClick={handleLogout}>
+                退出登录
+              </Button>
+            )}
             {versionLabel}
           </Space>
         </div>

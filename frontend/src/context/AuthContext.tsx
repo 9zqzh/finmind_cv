@@ -6,13 +6,15 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { api, getToken, onAuthExpired, setToken } from "../api/client";
+import { api, onAuthExpired, setToken } from "../api/client";
 
 interface AuthState {
   loggedIn: boolean;
   username: string | null;
   isAdmin: boolean;
   isSuperAdmin: boolean;
+  /** 评委演示模式：由后端共享会话提供登录态，隐藏退出按钮并避免登出共享会话 */
+  isDemo: boolean;
   loading: boolean;
   markLoggedIn: (username: string, isAdmin: boolean, isSuperAdmin: boolean) => void;
   logout: () => Promise<void>;
@@ -23,6 +25,7 @@ const AuthContext = createContext<AuthState>({
   username: null,
   isAdmin: false,
   isSuperAdmin: false,
+  isDemo: false,
   loading: true,
   markLoggedIn: () => {},
   logout: async () => {},
@@ -33,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [username, setUsername] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [isDemo, setIsDemo] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // 页面刷新时若本地有 token，向后端确认登录状态
@@ -42,12 +46,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUsername(null);
       setIsAdmin(false);
       setIsSuperAdmin(false);
+      setIsDemo(false);
       setLoading(false);
     });
-    if (!getToken()) {
-      setLoading(false);
-      return unsubscribe;
-    }
     api
       .authStatus()
       .then((status) => {
@@ -55,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUsername(status.username);
         setIsAdmin(status.is_admin);
         setIsSuperAdmin(status.is_super_admin);
+        setIsDemo(Boolean(status.demo_mode));
         if (!status.logged_in) {
           setToken(null);
         }
@@ -65,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUsername(null);
         setIsAdmin(false);
         setIsSuperAdmin(false);
+        setIsDemo(false);
       })
       .finally(() => setLoading(false));
     return unsubscribe;
@@ -75,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUsername(name);
     setIsAdmin(admin);
     setIsSuperAdmin(superAdmin);
+    setIsDemo(false);
   }, []);
 
   const logout = useCallback(async () => {
@@ -86,12 +90,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUsername(null);
       setIsAdmin(false);
       setIsSuperAdmin(false);
+      setIsDemo(false);
     }
   }, []);
 
   return (
     <AuthContext.Provider
-      value={{ loggedIn, username, isAdmin, isSuperAdmin, loading, markLoggedIn, logout }}
+      value={{ loggedIn, username, isAdmin, isSuperAdmin, isDemo, loading, markLoggedIn, logout }}
     >
       {children}
     </AuthContext.Provider>

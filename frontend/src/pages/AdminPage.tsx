@@ -6,14 +6,15 @@ import {
 } from "antd";
 import {
   ArrowLeftOutlined, CheckOutlined, CloseOutlined, ReloadOutlined,
-  DownloadOutlined, ThunderboltOutlined, UserAddOutlined,
+  DownloadOutlined, ExperimentOutlined, ThunderboltOutlined, UserAddOutlined,
 } from "@ant-design/icons";
 import { adminApi } from "../api/adminApi";
 import { ApiBizError } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import type {
   AdminConversationDetail, AdminConversationList, AdminDraft, AdminEvolveResult,
-  AdminGrantItem, AdminPlaybookList, AdminUserItem, AdminUserList, AuditLogItem, PagedData,
+  AdminGrantItem, AdminPlaybookList, AdminUserItem, AdminUserList, AuditLogItem,
+  DemoSessionInfo, PagedData,
 } from "../api/types";
 
 const PAGE_SIZE = 20;
@@ -36,6 +37,8 @@ const EVENT_LABELS: Record<string, string> = {
   "playbook.evolve": "触发进化",
   "playbook.approve": "通过草稿",
   "playbook.reject": "拒绝草稿",
+  "admin.demo_session.set": "设置评委共享会话",
+  "admin.demo_session.clear": "清除评委共享会话",
 };
 
 export default function AdminPage() {
@@ -67,6 +70,10 @@ export default function AdminPage() {
   const [actingId, setActingId] = useState<string | null>(null);
   const [evolving, setEvolving] = useState(false);
   const [evolveResult, setEvolveResult] = useState<AdminEvolveResult | null>(null);
+
+  const [demoInfo, setDemoInfo] = useState<DemoSessionInfo | null>(null);
+  const [demoToken, setDemoToken] = useState("");
+  const [demoActing, setDemoActing] = useState(false);
 
   const loadUsers = useCallback(async (page = userPage, q = userQuery) => {
     setLoading(true);
@@ -104,6 +111,13 @@ export default function AdminPage() {
     finally { setLoading(false); }
   }, []);
 
+  const loadDemoSession = useCallback(async () => {
+    setLoading(true);
+    try { setDemoInfo(await adminApi.demoSession()); }
+    catch (error) { message.error(errorMessage(error, "获取评委演示配置失败")); }
+    finally { setLoading(false); }
+  }, []);
+
   useEffect(() => { loadUsers(1, ""); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectTab = (key: string) => {
@@ -111,6 +125,7 @@ export default function AdminPage() {
     if (key === "users") loadUsers();
     else if (key === "admins") loadAdmins();
     else if (key === "logs") loadLogs();
+    else if (key === "demo") loadDemoSession();
     else if (["drafts", "playbooks", "evolve"].includes(key)) loadPlaybooks();
   };
 
@@ -290,6 +305,49 @@ export default function AdminPage() {
     {evolveResult && <Alert type="success" showIcon message={`发现 ${evolveResult.clusters_found} 个问题簇，生成 ${evolveResult.drafts.filter((d) => d.id).length} 个草稿`} />}
   </Space>;
 
+  const demoPanel = <Space direction="vertical" style={{ width: "100%" }} size="middle">
+    <Alert type="info" showIcon icon={<ExperimentOutlined />} message="评委演示模式（DEMO_MODE=true）"
+      description="开启后，所有未登录的访客会自动复用下方配置的共享教务会话，打开平台即直接进入主界面，可体验真实课表/成绩等个人数据，无需登录。共享会话随使用自动续期；失效后需重新配置。" />
+    <Card size="small" title="当前共享会话">
+      {demoInfo ? (demoInfo.configured ? <Descriptions size="small" column={1} bordered items={[
+        { key: "user", label: "共享账号", children: <Tag color="blue">{demoInfo.username}</Tag> },
+        { key: "updated", label: "最近更新", children: time(demoInfo.updated_at) },
+      ]} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="尚未配置共享会话（未配置时访客仍会看到登录页）" />) : <Spin />}
+    </Card>
+    {isSuperAdmin && <Card size="small" title="配置共享会话">
+      <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
+        用共享账号正常登录平台后，在浏览器开发者工具（F12）→ Network 中，从任意请求的请求头复制 <Typography.Text code>X-Session-Token</Typography.Text> 的值粘贴到下面：
+      </Typography.Paragraph>
+      <Space.Compact style={{ maxWidth: 560, width: "100%" }}>
+        <Input value={demoToken} onChange={(e) => setDemoToken(e.target.value.trim())} placeholder="粘贴共享账号的 X-Session-Token" />
+        <Button type="primary" icon={<ExperimentOutlined />} loading={demoActing} onClick={async () => {
+          if (!demoToken) { message.warning("请先粘贴会话令牌"); return; }
+          setDemoActing(true);
+          try {
+            const result = await adminApi.setDemoSession(demoToken);
+            message.success(`已设置共享会话：${result.username}`);
+            setDemoToken("");
+            await loadDemoSession();
+          } catch (error) { message.error(errorMessage(error, "设置失败")); }
+          finally { setDemoActing(false); }
+        }}>设为共享会话</Button>
+      </Space.Compact>
+      <div style={{ marginTop: 12 }}>
+        <Popconfirm title="清除共享会话后访客将回到登录页，确认？" onConfirm={async () => {
+          setDemoActing(true);
+          try {
+            const result = await adminApi.clearDemoSession();
+            message.success(result.cleared ? "已清除共享会话" : "当前没有共享会话");
+            await loadDemoSession();
+          } catch (error) { message.error(errorMessage(error, "清除失败")); }
+          finally { setDemoActing(false); }
+        }}>
+          <Button danger icon={<CloseOutlined />} loading={demoActing}>清除共享会话</Button>
+        </Popconfirm>
+      </div>
+    </Card>}
+  </Space>;
+
   return <div style={{ minHeight: "100vh", background: "#f0f2f5", padding: "24px 16px" }}>
     <div style={{ maxWidth: 1200, margin: "0 auto" }}>
       <Card style={{ marginBottom: 16 }}><Space style={{ width: "100%", justifyContent: "space-between" }} wrap>
@@ -303,6 +361,7 @@ export default function AdminPage() {
         { key: "drafts", label: `待审草稿（${drafts.length}）`, children: draftsPanel },
         { key: "playbooks", label: "手册列表", children: playbooksPanel },
         { key: "evolve", label: "触发进化", children: evolvePanel },
+        { key: "demo", label: "评委演示", children: demoPanel },
       ]} /></Card>
     </div>
     <Drawer width={760} open={drawerOpen} onClose={() => setDrawerOpen(false)} title={conversationDetail ? `对话详情：${conversationDetail.conversation.title}` : `用户 ${conversationList?.user.student_number ?? ""} 的对话`}>

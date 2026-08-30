@@ -219,3 +219,16 @@
 }
 
 
+
+/* 思考过程与来源文字字号基准（桌面端） */
+.chat-thinking {
+  font-size: 13px;
+}
+
+.chat-thinking__header {
+  font-size: 12px;
+}
+
+.chat-source {
+  font-size: 12px;
+}

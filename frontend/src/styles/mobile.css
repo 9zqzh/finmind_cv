@@ -500,13 +500,13 @@
   }
 
   .chat-welcome .ant-typography-title {
-    font-size: 15px !important;
+    font-size: 18px !important;
     line-height: 1.35;
-    margin-bottom: 4px !important;
+    margin-bottom: 6px !important;
   }
 
   .chat-welcome .ant-typography {
-    font-size: 12px !important;
+    font-size: 14px !important;
   }
 
   .chat-welcome .ant-space {
@@ -514,15 +514,15 @@
   }
 
   .chat-welcome .ant-btn {
-    height: 20px !important;
-    padding-inline: 8px !important;
-    font-size: 10px !important;
-    line-height: 20px;
+    height: 28px !important;
+    padding-inline: 10px !important;
+    font-size: 13px !important;
+    line-height: 28px;
   }
 
   .chat-message {
-    gap: 8px !important;
-    margin-bottom: 10px !important;
+    gap: 10px !important;
+    margin-bottom: 14px !important;
   }
 
   .chat-message .ant-avatar {
@@ -538,8 +538,10 @@
   }
 
   .chat-bubble {
-    padding: 6px 10px !important;
-    border-radius: 8px !important;
+    padding: 10px 14px !important;
+    border-radius: 10px !important;
+    font-size: 15px !important;
+    line-height: 1.7 !important;
   }
 
   .chat-input-bar {
@@ -596,9 +598,22 @@
   }
 
   .markdown-body {
-    font-size: 13px;
+    font-size: 15px;
+    line-height: 1.75;
   }
 
+  .chat-thinking {
+    font-size: 15px !important;
+    line-height: 1.7 !important;
+  }
+
+  .chat-thinking__header {
+    font-size: 13px !important;
+  }
+
+  .chat-source {
+    font-size: 13px !important;
+  }
   .markdown-body table {
     width: 100%;
   }

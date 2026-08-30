@@ -35,12 +35,12 @@ export function MessageBubble({ msg, loading, onThinkingToggle }: MessageBubbleP
         {/* 思考过程 */}
         {msg.thinkingContent && (
           <div
+            className="chat-thinking"
             style={{
               background: "#f0f5ff",
               border: "1px solid #d6e4ff",
               borderRadius: 8,
               marginBottom: 8,
-              fontSize: 13,
               lineHeight: 1.6,
               color: "#1d2939",
               overflow: "hidden",
@@ -57,7 +57,7 @@ export function MessageBubble({ msg, loading, onThinkingToggle }: MessageBubbleP
                 userSelect: "none",
               }}
             >
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              <Typography.Text type="secondary" className="chat-thinking__header">
                 <BulbOutlined style={{ marginRight: 4 }} />
                 AI 思考过程
                 <span style={{ marginLeft: 6, color: "#8c8c8c" }}>
@@ -148,7 +148,7 @@ export function MessageBubble({ msg, loading, onThinkingToggle }: MessageBubbleP
             )}
             {msg.chat.sources.length > 0 && (
               <div style={{ marginTop: 6 }}>
-                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                <Typography.Text type="secondary" className="chat-source">
                   来源：{msg.chat.sources.join("；")}
                 </Typography.Text>
               </div>
